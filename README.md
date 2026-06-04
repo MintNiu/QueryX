@@ -4,3 +4,11 @@ QueryX 是一个基于 MyBatis Plus 的查询增强框架。  通过 @Eq、@Like
 QueryX is a lightweight query enhancement framework built on top of MyBatis Plus.
 By using simple annotations such as @Eq, @Like, @In, and @Between, developers can define query conditions directly in DTOs without manually building LambdaQueryWrapper objects.
 QueryX focuses on reducing repetitive CRUD code, improving readability, and accelerating backend development.
+
+UserQuery
+      ↓
+   QueryX
+      ↓
+LambdaQueryWrapper
+      ↓
+   SQL
