@@ -12,3 +12,64 @@ UserQuery
 LambdaQueryWrapper
       ↓
    SQL
+
+Write DTO, not Wrapper.
+
+QueryX is an annotation-driven query enhancement framework for MyBatis Plus.
+
+It automatically converts Query DTOs into LambdaQueryWrapper objects, helping developers reduce repetitive query-building code.
+
+## Example
+
+### Before
+
+```java
+LambdaQueryWrapper<User> wrapper =
+    Wrappers.lambdaQuery();
+
+if (StringUtils.isNotBlank(query.getUsername())) {
+    wrapper.like(User::getUsername, query.getUsername());
+}
+
+if (query.getStatus() != null) {
+    wrapper.eq(User::getStatus, query.getStatus());
+}
+```
+
+### After
+
+```java
+public class UserQuery {
+
+    @Like
+    private String username;
+
+    @Eq
+    private Integer status;
+}
+```
+
+```java
+LambdaQueryWrapper<User> wrapper =
+    queryExecutor.wrapper(query);
+```
+
+## Features
+
+* @Eq
+* @Like
+* @In
+* @Between
+* Spring Boot Starter
+* MyBatis Plus Integration
+
+## Roadmap
+
+* [x] Query DTO -> Wrapper
+* [ ] Pagination Support
+* [ ] Dynamic Sorting
+* [ ] Join Query
+* [ ] Data Permission
+* [ ] Multi Tenant
+* [ ] Kotlin DSL
+
