@@ -3,13 +3,33 @@ server:
 
 spring:
   application:
-    name: queryx-demo
+    name: queryx-example
   datasource:
     url: jdbc:mysql://172.0.0.1:3306/QueryX_db?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai
     username: root
     password: root
     driver-class-name: com.mysql.cj.jdbc.Driver
+
+# QueryX 配置
+queryx:
+  enabled: true
+  
+  # 启用排序字段白名单验证（防止 SQL 注入）
+  orderByWhitelistEnabled: true
+  
+  # 允许的排序字段白名单
+  orderByWhitelist:
+    - id
+    - username
+    - email
+    - age
+    - status
+    - create_time
+  
+  # 分页最大每页数量（默认 500）
+  maxPageSize: 500
+
 logging:
   level:
     org.springframework.web: debug
-    com.example.queryx.mapper: debug  # ← 添加这行可以看到 SQL
+    com.example.queryx.mapper: debug

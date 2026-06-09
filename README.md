@@ -266,6 +266,52 @@ public abstract class BasePageQuery implements Serializable {
 }
 ```
 
+### 排序字段白名单验证（新功能）⭐
+
+**安全特性**：防止 SQL 注入攻击，只允许配置的字段参与排序。
+
+**配置方式**（application.yml）：
+```yaml
+queryx:
+  enabled: true
+  
+  # 启用排序字段白名单验证
+  orderByWhitelistEnabled: true
+  
+  # 允许的排序字段白名单
+  orderByWhitelist:
+    - id
+    - username
+    - email
+    - age
+    - status
+    - create_time
+```
+
+**三种处理策略**：
+
+#### 1. 过滤 + 警告模式（推荐）✅
+自动过滤不在白名单中的字段，合法字段继续排序，输出警告日志。
+
+```bash
+# 请求：id（✅合法）, password（❌非法）, email（✅合法）
+GET /api/users/page?orderBy=id:desc,password:asc,email:desc
+
+# 结果：
+# ✅ 执行排序：ORDER BY id DESC, email DESC
+# ⚠️  日志警告：[QueryX] 排序字段 'password' 不在白名单中，已忽略
+```
+
+#### 2. 严格模式
+只要有一个字段不合法，整个请求被拒绝（已废弃）。
+
+#### 3. 过滤模式
+静默过滤非法字段，不输出警告（不推荐）。
+
+**核心类**：
+- `OrderByValidator` - 排序字段白名单验证器
+- `OrderByResult` - 验证结果（包含过滤后的排序和警告信息）
+
 ## Features
 
 ### 核心功能
@@ -289,6 +335,8 @@ public abstract class BasePageQuery implements Serializable {
 * ✅ 灵活的 LIKE 匹配模式（前缀、后缀、前后）
 * ✅ **分页查询支持**（BasePageQuery 基类）
 * ✅ **动态排序支持**（多字段排序：`field:desc,field2:asc`）
+* ✅ **排序字段白名单验证**（防止 SQL 注入，支持过滤+警告模式）
+* ✅ **分页参数自动校验**（current ≥ 1, 1 ≤ size ≤ 500）
 
 ### 版本信息
 * **Spring Boot**: 3.2.5
@@ -308,13 +356,15 @@ public abstract class BasePageQuery implements Serializable {
 * [x] 比较运算符支持（GT/LT/GE/LE）
 * [x] **分页查询支持**（BasePageQuery 基类）
 * [x] **动态排序支持**（@OrderBy 注解，多字段排序）
+* [x] **分页参数自动校验**（current ≥ 1, 1 ≤ size ≤ 500）
+* [x] **排序字段白名单验证**（OrderByValidator，过滤+警告模式）
 * [x] Spring Boot Starter 自动配置
 * [x] 完整的测试示例项目
 * [x] MyBatis Plus 分页插件配置
 
 ### 开发中 🚧
-* [ ] 分页参数校验和限制
-* [ ] 排序字段白名单机制
+* [ ] 分页参数可配置化（自定义 maxPageSize）
+* [ ] 全局异常处理器（友好错误响应）
 
 ### 计划中 📋
 * [ ] 多表 Join 查询
@@ -337,12 +387,16 @@ queryx/
 │   │   └── @OrderBy                      # 动态排序（多字段排序）
 │   ├── builder/                          # Wrapper 构建器
 │   │   ├── WrapperBuilder                # 接口定义
-│   │   └── DefaultWrapperBuilder         # 默认实现
+│   │   └── DefaultWrapperBuilder         # 默认实现（支持白名单验证）
 │   ├── parser/                           # 查询解析器
 │   ├── metadata/                         # 元数据定义
+│   ├── validator/                        # 验证器（新增）
+│   │   ├── OrderByValidator              # 排序字段白名单验证器
+│   │   └── OrderByResult                 # 验证结果（过滤后的排序+警告）
 │   └── support/                          # 支持类
-│       └── BasePageQuery                 # 分页查询基类
+│       └── BasePageQuery                 # 分页查询基类（含参数校验）
 ├── queryx-spring-boot-autoconfigure/     # Spring Boot 自动配置
+│   └── QueryXAutoConfiguration           # 自动配置类（支持白名单配置）
 ├── queryx-spring-boot-starter/           # Starter 依赖
 └── queryx-example/                       # 示例项目
     ├── config/

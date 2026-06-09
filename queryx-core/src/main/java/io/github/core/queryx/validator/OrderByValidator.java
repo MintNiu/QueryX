@@ -1,5 +1,6 @@
 package io.github.core.queryx.validator;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
@@ -78,25 +79,31 @@ public class OrderByValidator {
     }
 
     /**
-     * 验证排序字符串
+     * 验证并过滤排序字符串
+     * 
+     * <p>自动过滤不在白名单中的字段，返回过滤后的排序字符串和警告信息。</p>
      * 
      * @param orderBy 排序字符串，格式："id:desc,username:asc"
-     * @throws IllegalArgumentException 如果排序字段不在白名单中
+     * @return 验证结果（包含过滤后的排序字符串和警告信息）
      */
-    public void validate(String orderBy) {
-        // 如果白名单为空，不进行验证
+    public OrderByResult validateAndFilter(String orderBy) {
+        // 如果白名单为空，不进行验证和过滤
         if (allowedFields.isEmpty()) {
-            return;
+            return new OrderByResult(orderBy, Collections.emptyList());
         }
 
         if (orderBy == null || orderBy.trim().isEmpty()) {
-            return;
+            return new OrderByResult(orderBy, Collections.emptyList());
         }
+
+        List<String> validOrderFields = new ArrayList<>();
+        List<String> warnings = new ArrayList<>();
 
         // 解析并验证每个排序字段
         String[] orderFields = orderBy.split(",");
         for (String orderField : orderFields) {
-            String[] parts = orderField.trim().split(":");
+            String trimmedField = orderField.trim();
+            String[] parts = trimmedField.split(":");
             String fieldName = parts[0].trim();
 
             if (fieldName.isEmpty()) {
@@ -104,15 +111,18 @@ public class OrderByValidator {
             }
 
             // 检查字段是否在白名单中
-            if (!allowedFields.contains(fieldName)) {
-                throw new IllegalArgumentException(
-                    String.format("排序字段 '%s' 不在允许的白名单中，允许的字段：%s", 
-                        fieldName, String.join(", ", allowedFields))
-                );
+            if (allowedFields.contains(fieldName)) {
+                validOrderFields.add(trimmedField);
+            } else {
+                warnings.add(String.format("排序字段 '%s' 不在白名单中，已忽略", fieldName));
             }
         }
-    }
 
+        // 返回过滤后的结果
+        String filteredOrderBy = validOrderFields.isEmpty() ? null : String.join(",", validOrderFields);
+        return new OrderByResult(filteredOrderBy, warnings);
+    }
+    
     /**
      * 检查是否允许指定字段排序
      * 

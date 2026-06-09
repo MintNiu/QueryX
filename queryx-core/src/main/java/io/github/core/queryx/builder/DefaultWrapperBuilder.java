@@ -5,7 +5,9 @@ import io.github.core.queryx.metadata.QueryFieldMetadata;
 import io.github.core.queryx.metadata.QueryOperator;
 import io.github.core.queryx.parser.QueryParser;
 import io.github.core.queryx.support.BasePageQuery;
+import io.github.core.queryx.validator.OrderByResult;
 import io.github.core.queryx.validator.OrderByValidator;
+import lombok.extern.slf4j.Slf4j;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -20,6 +22,7 @@ import java.util.Set;
  * 
  * @author MintNiu
  */
+@Slf4j
 public class DefaultWrapperBuilder implements WrapperBuilder {
 
     private final QueryParser queryParser;
@@ -100,13 +103,25 @@ public class DefaultWrapperBuilder implements WrapperBuilder {
             return;
         }
         
-        // 白名单验证
+        // 白名单验证和过滤
+        String filteredOrderBy = orderBy;
         if (orderByValidator != null) {
-            orderByValidator.validate(orderBy);
+            OrderByResult result = orderByValidator.validateAndFilter(orderBy);
+            filteredOrderBy = result.getFilteredOrderBy();
+            
+            // 输出警告信息
+            if (result.hasWarnings()) {
+                result.getWarnings().forEach(warn -> log.warn("[QueryX] {}", warn));
+            }
+        }
+        
+        // 如果过滤后没有合法的排序字段，直接返回
+        if (filteredOrderBy == null || filteredOrderBy.trim().isEmpty()) {
+            return;
         }
         
         // 解析排序字符串："id:desc,age:asc"
-        String[] orderFields = orderBy.split(",");
+        String[] orderFields = filteredOrderBy.split(",");
         for (String orderField : orderFields) {
             String[] parts = orderField.trim().split(":");
             String fieldName = parts[0].trim();
