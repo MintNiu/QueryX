@@ -24,10 +24,15 @@ public @interface Like {
     /**
      * 是否开启前缀匹配
      */
-    boolean likePrefix() default false;
+    boolean likePrefix() default true;
     
     /**
      * 是否开启后缀匹配
      */
     boolean likeSuffix() default true;
+    
+    /**
+     * 是否取反（NOT LIKE）
+     */
+    boolean not() default false;
 }

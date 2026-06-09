@@ -40,16 +40,22 @@ public class ReflectionQueryParser implements QueryParser {
                 Eq eq = field.getAnnotation(Eq.class);
                 if (eq != null) {
                     String fieldName = eq.value().trim().isEmpty() ? field.getName() : eq.value();
-                    result.add(new QueryFieldMetadata(fieldName, value, QueryOperator.EQ));
+                    QueryFieldMetadata metadata = new QueryFieldMetadata(fieldName, value, 
+                        convertEqOpToOperator(eq.op(), eq.not()));
+                    metadata.setNot(eq.not());
+                    metadata.setOp(eq.op());
+                    result.add(metadata);
                     continue;
                 }
                 
                 Like like = field.getAnnotation(Like.class);
                 if (like != null) {
                     String fieldName = like.value().trim().isEmpty() ? field.getName() : like.value();
-                    QueryFieldMetadata metadata = new QueryFieldMetadata(fieldName, value, QueryOperator.LIKE);
+                    QueryFieldMetadata metadata = new QueryFieldMetadata(fieldName, value, 
+                        like.not() ? QueryOperator.NOT_LIKE : QueryOperator.LIKE);
                     metadata.setLikePrefix(like.likePrefix());
                     metadata.setLikeSuffix(like.likeSuffix());
+                    metadata.setNot(like.not());
                     result.add(metadata);
                     continue;
                 }
@@ -57,7 +63,10 @@ public class ReflectionQueryParser implements QueryParser {
                 In in = field.getAnnotation(In.class);
                 if (in != null && value instanceof Collection) {
                     String fieldName = in.value().trim().isEmpty() ? field.getName() : in.value();
-                    result.add(new QueryFieldMetadata(fieldName, value, QueryOperator.IN));
+                    QueryFieldMetadata metadata = new QueryFieldMetadata(fieldName, value, 
+                        in.not() ? QueryOperator.NOT_IN : QueryOperator.IN);
+                    metadata.setNot(in.not());
+                    result.add(metadata);
                     continue;
                 }
                 
@@ -76,5 +85,23 @@ public class ReflectionQueryParser implements QueryParser {
             }
         }
         return result;
+    }
+    
+    /**
+     * 将 Eq.Op 转换为 QueryOperator
+     */
+    private QueryOperator convertEqOpToOperator(Eq.Op op, boolean not) {
+        // 如果设置了 op 属性，优先使用 op
+        if (op != Eq.Op.EQ) {
+            switch (op) {
+                case GT: return QueryOperator.GT;
+                case LT: return QueryOperator.LT;
+                case GE: return QueryOperator.GE;
+                case LE: return QueryOperator.LE;
+                default: return QueryOperator.EQ;
+            }
+        }
+        // 否则使用 not 属性
+        return not ? QueryOperator.NE : QueryOperator.EQ;
     }
 }

@@ -1,5 +1,7 @@
 package io.github.core.queryx.metadata;
 
+import io.github.core.queryx.annotation.Eq;
+
 /**
  * 查询字段元数据
  * 
@@ -12,6 +14,8 @@ public class QueryFieldMetadata {
     private QueryOperator operator;
     private boolean likePrefix;
     private boolean likeSuffix;
+    private boolean not;
+    private Eq.Op op;
 
     public QueryFieldMetadata() {
     }
@@ -60,5 +64,21 @@ public class QueryFieldMetadata {
 
     public void setLikeSuffix(boolean likeSuffix) {
         this.likeSuffix = likeSuffix;
+    }
+    
+    public boolean isNot() {
+        return not;
+    }
+    
+    public void setNot(boolean not) {
+        this.not = not;
+    }
+    
+    public Eq.Op getOp() {
+        return op;
+    }
+    
+    public void setOp(Eq.Op op) {
+        this.op = op;
     }
 }

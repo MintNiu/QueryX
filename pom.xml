@@ -28,9 +28,9 @@
 
         <java.version>17</java.version>
 
-        <spring.boot.version>3.5.0</spring.boot.version>
+        <spring.boot.version>3.2.5</spring.boot.version>
 
-        <mybatis-plus.version>3.5.12</mybatis-plus.version>
+        <mybatis-plus.version>3.5.5</mybatis-plus.version>
 
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
@@ -48,6 +48,13 @@
                 <version>${spring.boot.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
+            </dependency>
+
+            <!-- 强制使用兼容的 MyBatis 版本 -->
+            <dependency>
+                <groupId>org.mybatis</groupId>
+                <artifactId>mybatis-spring</artifactId>
+                <version>3.0.3</version>
             </dependency>
 
         </dependencies>

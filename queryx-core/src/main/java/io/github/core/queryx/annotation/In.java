@@ -20,4 +20,9 @@ public @interface In {
      * 数据库字段名，为空时使用属性名
      */
     String value() default "";
+    
+    /**
+     * 是否取反（NOT IN）
+     */
+    boolean not() default false;
 }

@@ -1,0 +1,15 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: queryx-demo
+  datasource:
+    url: jdbc:mysql://39.107.69.23:3306/QueryX_db?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai
+    username: root
+    password: Bafan@2026xixunxun
+    driver-class-name: com.mysql.cj.jdbc.Driver
+logging:
+  level:
+    org.springframework.web: debug
+    com.example.queryx.mapper: debug  # ← 添加这行可以看到 SQL
