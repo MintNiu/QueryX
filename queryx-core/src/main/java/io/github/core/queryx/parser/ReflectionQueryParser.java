@@ -5,6 +5,7 @@ import io.github.core.queryx.annotation.BetweenValue;
 import io.github.core.queryx.annotation.Eq;
 import io.github.core.queryx.annotation.In;
 import io.github.core.queryx.annotation.Like;
+import io.github.core.queryx.annotation.OrderBy;
 import io.github.core.queryx.metadata.QueryFieldMetadata;
 import io.github.core.queryx.metadata.QueryOperator;
 
@@ -76,6 +77,18 @@ public class ReflectionQueryParser implements QueryParser {
                     BetweenValue betweenValue = (BetweenValue) value;
                     if (betweenValue.getLeft() != null || betweenValue.getRight() != null) {
                         result.add(new QueryFieldMetadata(fieldName, value, QueryOperator.BETWEEN));
+                    }
+                    continue;
+                }
+                
+                // @OrderBy 注解不生成查询条件，但需要解析排序字段
+                OrderBy orderBy = field.getAnnotation(OrderBy.class);
+                if (orderBy != null && value instanceof String) {
+                    // 排序信息存储在 QueryFieldMetadata 中，operator 为 ORDER_BY
+                    String orderByStr = (String) value;
+                    if (orderByStr != null && !orderByStr.trim().isEmpty()) {
+                        QueryFieldMetadata metadata = new QueryFieldMetadata("_orderBy", value, QueryOperator.ORDER_BY);
+                        result.add(metadata);
                     }
                     continue;
                 }

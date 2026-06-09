@@ -4,11 +4,16 @@ import io.github.core.queryx.annotation.BetweenValue;
 import io.github.core.queryx.metadata.QueryFieldMetadata;
 import io.github.core.queryx.metadata.QueryOperator;
 import io.github.core.queryx.parser.QueryParser;
+import io.github.core.queryx.support.BasePageQuery;
+import io.github.core.queryx.validator.OrderByValidator;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
+import java.util.Set;
 
 /**
  * 默认的 Wrapper 构建器实现
@@ -18,9 +23,28 @@ import java.util.List;
 public class DefaultWrapperBuilder implements WrapperBuilder {
 
     private final QueryParser queryParser;
+    
+    /**
+     * 排序字段白名单验证器（可选）
+     */
+    private OrderByValidator orderByValidator;
 
     public DefaultWrapperBuilder(QueryParser queryParser) {
         this.queryParser = queryParser;
+    }
+    
+    public DefaultWrapperBuilder(QueryParser queryParser, String... allowedOrderFields) {
+        this.queryParser = queryParser;
+        if (allowedOrderFields != null && allowedOrderFields.length > 0) {
+            this.orderByValidator = new OrderByValidator(allowedOrderFields);
+        }
+    }
+    
+    public DefaultWrapperBuilder(QueryParser queryParser, Set<String> allowedOrderFields) {
+        this.queryParser = queryParser;
+        if (allowedOrderFields != null && !allowedOrderFields.isEmpty()) {
+            this.orderByValidator = new OrderByValidator(allowedOrderFields);
+        }
     }
 
     @Override
@@ -32,10 +56,83 @@ public class DefaultWrapperBuilder implements WrapperBuilder {
 
         List<QueryFieldMetadata> metadataList = queryParser.parse(query);
         for (QueryFieldMetadata metadata : metadataList) {
+            // 跳过排序字段（不是查询条件）
+            if (metadata.getOperator() == QueryOperator.ORDER_BY) {
+                continue;
+            }
             applyCondition(wrapper, metadata);
         }
 
         return wrapper;
+    }
+    
+    @Override
+    public <T> Page<T> buildPage(Object query) {
+        if (!(query instanceof BasePageQuery)) {
+            throw new IllegalArgumentException("Query object must extend BasePageQuery for pagination");
+        }
+        
+        BasePageQuery pageQuery = (BasePageQuery) query;
+        return new Page<>(pageQuery.getCurrent(), pageQuery.getSize());
+    }
+    
+    @Override
+    public <T> QueryWrapper<T> buildPageWrapper(Object query) {
+        // 构建查询条件
+        QueryWrapper<T> wrapper = build(query);
+        
+        // 应用排序到 QueryWrapper
+        List<QueryFieldMetadata> metadataList = queryParser.parse(query);
+        for (QueryFieldMetadata metadata : metadataList) {
+            if (metadata.getOperator() == QueryOperator.ORDER_BY) {
+                String orderByStr = (String) metadata.getValue();
+                applyOrder(wrapper, orderByStr);
+                break; // 只处理第一个 @OrderBy 字段
+            }
+        }
+        
+        return wrapper;
+    }
+    
+    @Override
+    public <T> void applyOrder(QueryWrapper<T> wrapper, String orderBy) {
+        if (orderBy == null || orderBy.trim().isEmpty()) {
+            return;
+        }
+        
+        // 白名单验证
+        if (orderByValidator != null) {
+            orderByValidator.validate(orderBy);
+        }
+        
+        // 解析排序字符串："id:desc,age:asc"
+        String[] orderFields = orderBy.split(",");
+        for (String orderField : orderFields) {
+            String[] parts = orderField.trim().split(":");
+            String fieldName = parts[0].trim();
+            
+            if (fieldName.isEmpty()) {
+                continue;
+            }
+            
+            // 默认 asc
+            String direction = parts.length > 1 ? parts[1].trim().toLowerCase() : "asc";
+            
+            if ("desc".equals(direction)) {
+                wrapper.orderByDesc(fieldName);
+            } else {
+                wrapper.orderByAsc(fieldName);
+            }
+        }
+    }
+    
+    /**
+     * 设置排序字段白名单验证器
+     * 
+     * @param validator 验证器
+     */
+    public void setOrderByValidator(OrderByValidator validator) {
+        this.orderByValidator = validator;
     }
 
     private <T> void applyCondition(QueryWrapper<T> wrapper, QueryFieldMetadata metadata) {
