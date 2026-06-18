@@ -1,5 +1,8 @@
 package io.github.core.queryx.validator;
 
+import lombok.Getter;
+import lombok.ToString;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -31,6 +34,8 @@ import java.util.List;
  * @author MintNiu
  * @since 0.1.0
  */
+@Getter
+@ToString
 public class OrderByResult {
 
     /**
@@ -55,37 +60,11 @@ public class OrderByResult {
     }
 
     /**
-     * 获取过滤后的排序字符串
-     * 
-     * @return 排序字符串，格式："id:desc,email:asc"
-     */
-    public String getFilteredOrderBy() {
-        return filteredOrderBy;
-    }
-
-    /**
-     * 获取警告信息列表
-     * 
-     * @return 警告信息列表
-     */
-    public List<String> getWarnings() {
-        return warnings;
-    }
-
-    /**
      * 是否有警告信息
      * 
      * @return true 如果有警告，false 否则
      */
     public boolean hasWarnings() {
         return !warnings.isEmpty();
-    }
-
-    @Override
-    public String toString() {
-        return "OrderByResult{" +
-                "filteredOrderBy='" + filteredOrderBy + '\'' +
-                ", warnings=" + warnings +
-                '}';
     }
 }

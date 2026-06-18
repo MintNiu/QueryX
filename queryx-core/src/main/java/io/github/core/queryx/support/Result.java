@@ -1,5 +1,9 @@
 package io.github.core.queryx.support;
 
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
 import java.io.Serializable;
 
 /**
@@ -34,6 +38,9 @@ import java.io.Serializable;
  * @author MintNiu
  * @since 0.1.0
  */
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
 public class Result<T> implements Serializable {
 
     private static final long serialVersionUID = 1L;
@@ -52,15 +59,6 @@ public class Result<T> implements Serializable {
      * 响应数据
      */
     private T data;
-
-    public Result() {
-    }
-
-    public Result(int code, String message, T data) {
-        this.code = code;
-        this.message = message;
-        this.data = data;
-    }
 
     /**
      * 成功响应
@@ -115,29 +113,5 @@ public class Result<T> implements Serializable {
      */
     public static <T> Result<T> badRequest(String message) {
         return new Result<>(400, message, null);
-    }
-
-    public int getCode() {
-        return code;
-    }
-
-    public void setCode(int code) {
-        this.code = code;
-    }
-
-    public String getMessage() {
-        return message;
-    }
-
-    public void setMessage(String message) {
-        this.message = message;
-    }
-
-    public T getData() {
-        return data;
-    }
-
-    public void setData(T data) {
-        this.data = data;
     }
 }
