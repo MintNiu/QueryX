@@ -312,6 +312,71 @@ GET /api/users/page?orderBy=id:desc,password:asc,email:desc
 - `OrderByValidator` - 排序字段白名单验证器
 - `OrderByResult` - 验证结果（包含过滤后的排序和警告信息）
 
+### 全局异常处理器（新功能）⭐
+
+**开箱即用**：引入 Starter 后自动注册全局异常处理器，统一返回 JSON 格式响应。
+
+**处理的异常类型**：
+
+| 异常类型 | 状态码 | 场景 |
+|---------|-------|------|
+| `IllegalArgumentException` | 400 | 参数错误（分页参数、排序白名单等） |
+| `IllegalStateException` | 503 | 状态错误（配置错误等） |
+| `Exception` | 500 | 其他未知异常 |
+
+**响应示例**：
+```json
+{
+  "code": 400,
+  "message": "分页数量 1000 超过最大限制 500",
+  "data": null
+}
+```
+
+**自定义方式**：
+- 创建自己的 `QueryXExceptionHandler` Bean 覆盖
+- 配置 `queryx.exceptionHandlerEnabled: false` 完全禁用
+
+**统一响应类**（`Result`）：
+```java
+// 成功响应
+return Result.success(userList);
+
+// 参数错误
+return Result.badRequest("参数错误");
+
+// 自定义错误
+return Result.error(503, "服务不可用");
+```
+
+## Configuration
+
+所有配置项均可在 `application.yml` 中设置，以下为完整配置参考：
+
+```yaml
+queryx:
+  # 是否启用 QueryX（设为 false 则不注册任何 Bean）
+  enabled: true
+
+  # 是否启用全局异常处理器（默认 true，开箱即用）
+  exceptionHandlerEnabled: true
+
+  # 是否启用排序字段白名单验证（防止 SQL 注入）
+  orderByWhitelistEnabled: true
+
+  # 允许的排序字段白名单
+  orderByWhitelist:
+    - id
+    - username
+    - email
+    - age
+    - status
+    - create_time
+
+  # 分页最大每页数量（默认 500，超过自动调整并输出警告日志）
+  maxPageSize: 500
+```
+
 ## Features
 
 ### 核心功能
@@ -336,7 +401,9 @@ GET /api/users/page?orderBy=id:desc,password:asc,email:desc
 * ✅ **分页查询支持**（BasePageQuery 基类）
 * ✅ **动态排序支持**（多字段排序：`field:desc,field2:asc`）
 * ✅ **排序字段白名单验证**（防止 SQL 注入，支持过滤+警告模式）
-* ✅ **分页参数自动校验**（current ≥ 1, 1 ≤ size ≤ 500）
+* ✅ **分页参数自动校验**（current ≥ 1, 1 ≤ size ≤ maxPageSize，可配置）
+* ✅ **全局异常处理器**（自动注册，统一 JSON 响应，可开关）
+* ✅ **统一响应结果**（Result 类，标准化 API 响应格式）
 
 ### 版本信息
 * **Spring Boot**: 3.2.5
@@ -356,15 +423,16 @@ GET /api/users/page?orderBy=id:desc,password:asc,email:desc
 * [x] 比较运算符支持（GT/LT/GE/LE）
 * [x] **分页查询支持**（BasePageQuery 基类）
 * [x] **动态排序支持**（@OrderBy 注解，多字段排序）
-* [x] **分页参数自动校验**（current ≥ 1, 1 ≤ size ≤ 500）
+* [x] **分页参数自动校验**（current ≥ 1, 1 ≤ size ≤ maxPageSize）
 * [x] **排序字段白名单验证**（OrderByValidator，过滤+警告模式）
+* [x] **分页参数可配置化**（maxPageSize 支持 application.yml 配置）
+* [x] **全局异常处理器**（QueryXExceptionHandler，自动注册，可开关）
+* [x] **统一响应结果**（Result 类，标准化 API 响应格式）
 * [x] Spring Boot Starter 自动配置
 * [x] 完整的测试示例项目
 * [x] MyBatis Plus 分页插件配置
 
 ### 开发中 🚧
-* [ ] 分页参数可配置化（自定义 maxPageSize）
-* [ ] 全局异常处理器（友好错误响应）
 
 ### 计划中 📋
 * [ ] 多表 Join 查询
@@ -394,9 +462,12 @@ queryx/
 │   │   ├── OrderByValidator              # 排序字段白名单验证器
 │   │   └── OrderByResult                 # 验证结果（过滤后的排序+警告）
 │   └── support/                          # 支持类
-│       └── BasePageQuery                 # 分页查询基类（含参数校验）
+│       ├── BasePageQuery                 # 分页查询基类（含参数校验）
+│       └── Result                        # 统一响应结果
 ├── queryx-spring-boot-autoconfigure/     # Spring Boot 自动配置
-│   └── QueryXAutoConfiguration           # 自动配置类（支持白名单配置）
+│   ├── QueryXAutoConfiguration           # 自动配置类（支持全部配置项）
+│   ├── QueryXProperties                  # 配置属性（enabled/maxPageSize 等）
+│   └── QueryXExceptionHandler            # 全局异常处理器（自动注册）
 ├── queryx-spring-boot-starter/           # Starter 依赖
 └── queryx-example/                       # 示例项目
     ├── config/
@@ -405,3 +476,14 @@ queryx/
         └── UserController                # 示例控制器
 ```
 
+## 写在最后
+`QueryX` 遵循 [MIT](https://opensource.org/licenses/MIT) 开源协议，欢迎大家 fork 和贡献。
+这个项目在开发过程中，我参考了很多开源项目，比如：MyBatis Plus、MyBatis、Spring Boot、Spring Data JPA 等。一直喜欢这些开源项目，也想自己写一个类似的东西，但是没有时间，所以才开发了 `QueryX`。
+`QueryX` 的主要 goal 是为开发人员提供一种更简单的方式来构建查询条件，并支持动态排序和排序字段白名单验证，便于开发人员快速实现查询功能和新人快速上手，降低开发成本，提高开发效率。
+`QueryX` 的主要特色是：
+1. 集成 MyBatis Plus，支持 MyBatis Plus 的所有功能，如分页、排序、条件构造等。
+2. 简单功能的实现，如精确等于查询、模糊查询、集合查询、范围查询、动态排序、排序字段白名单验证等。
+3. 在瀑布流模式下，支持多种查询条件组合，如 OR、AND 等。
+4. 减少错误，如字段不存在、字段类型不匹配、字段值不合法等。
+5. 最后就是减少大家的加班、提高开发效率。（早早写完，早点下班）
+最后的最后，希望 `QueryX` 帮助大家实现查询功能，让开发人员更加轻松，有时间和空闲去做更多其他的事情。

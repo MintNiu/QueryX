@@ -57,11 +57,6 @@ public abstract class BasePageQuery implements Serializable {
     private static final Long DEFAULT_SIZE = 10L;
     
     /**
-     * 最大每页大小（防止恶意请求大量数据）
-     */
-    private static final Long MAX_SIZE = 500L;
-    
-    /**
      * 最小页码
      */
     private static final Long MIN_CURRENT = 1L;
@@ -72,7 +67,7 @@ public abstract class BasePageQuery implements Serializable {
     private Long current = 1L;
 
     /**
-     * 每页大小，默认10，最大500
+     * 每页大小，默认10
      */
     private Long size = 10L;
     
@@ -90,15 +85,14 @@ public abstract class BasePageQuery implements Serializable {
     }
     
     /**
-     * 设置每页大小（自动校验和限制）
+     * 设置每页大小（自动校验）
+     * <p>注意：上限由 DefaultWrapperBuilder 的 maxPageSize 配置控制</p>
      * 
      * @param size 每页大小
      */
     public void setSize(Long size) {
         if (size == null || size < 1) {
             this.size = DEFAULT_SIZE;
-        } else if (size > MAX_SIZE) {
-            this.size = MAX_SIZE;
         } else {
             this.size = size;
         }

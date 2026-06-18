@@ -8,31 +8,62 @@ import java.util.List;
 /**
  * QueryX 配置属性
  * 
+ * <p>通过 {@code @ConfigurationProperties} 绑定 application.yml 中的 queryx 前缀配置。</p>
+ * 
+ * <h3>配置示例（application.yml）：</h3>
+ * <pre>
+ * queryx:
+ *   enabled: true                        # 是否启用 QueryX
+ *   orderByWhitelistEnabled: true        # 是否启用排序字段白名单验证
+ *   orderByWhitelist:                    # 允许的排序字段列表
+ *     - id
+ *     - username
+ *     - create_time
+ *   maxPageSize: 500                     # 分页最大每页数量
+ *   exceptionHandlerEnabled: true        # 是否启用全局异常处理器
+ * </pre>
+ * 
  * @author MintNiu
+ * @since 0.1.0
  */
 @ConfigurationProperties(prefix = "queryx")
 public class QueryXProperties {
 
     /**
      * 是否启用 QueryX
+     * <p>设为 false 将不注册 QueryParser 和 WrapperBuilder Bean。</p>
+     * <p>默认：true</p>
      */
     private boolean enabled = true;
     
     /**
      * 排序字段白名单（为空表示不限制）
-     * 例如：id,username,email,status,create_time
+     * <p>例如：id,username,email,status,create_time</p>
+     * <p>需配合 {@link #orderByWhitelistEnabled} 使用。</p>
      */
     private List<String> orderByWhitelist = new ArrayList<>();
     
     /**
      * 是否启用排序字段白名单验证
+     * <p>启用后，未在 {@link #orderByWhitelist} 中的排序字段将被过滤，并输出警告日志。</p>
+     * <p>默认：false（向后兼容，不验证）</p>
      */
     private boolean orderByWhitelistEnabled = false;
     
     /**
      * 分页最大每页数量
+     * <p>超过此值的每页数量将被自动调整为该值，并输出警告日志。</p>
+     * <p>默认：500</p>
      */
     private Long maxPageSize = 500L;
+    
+    /**
+     * 是否启用全局异常处理器
+     * <p>启用后自动注册 {@link QueryXExceptionHandler}，统一处理异常并返回 JSON 响应。</p>
+     * <p>用户可自行创建同名 Bean 覆盖，或设为 false 完全禁用。</p>
+     * <p>默认：true</p>
+     */
+    private boolean exceptionHandlerEnabled = true;
 
     public boolean isEnabled() {
         return enabled;
@@ -64,5 +95,13 @@ public class QueryXProperties {
 
     public void setMaxPageSize(Long maxPageSize) {
         this.maxPageSize = maxPageSize;
+    }
+    
+    public boolean isExceptionHandlerEnabled() {
+        return exceptionHandlerEnabled;
+    }
+
+    public void setExceptionHandlerEnabled(boolean exceptionHandlerEnabled) {
+        this.exceptionHandlerEnabled = exceptionHandlerEnabled;
     }
 }
