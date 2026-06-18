@@ -305,9 +305,6 @@ GET /api/users/page?orderBy=id:desc,password:asc,email:desc
 #### 2. 严格模式
 只要有一个字段不合法，整个请求被拒绝（已废弃）。
 
-#### 3. 过滤模式
-静默过滤非法字段，不输出警告（不推荐）。
-
 **核心类**：
 - `OrderByValidator` - 排序字段白名单验证器
 - `OrderByResult` - 验证结果（包含过滤后的排序和警告信息）
