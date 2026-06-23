@@ -5,6 +5,7 @@ import io.github.core.queryx.annotation.BetweenValue;
 import io.github.core.queryx.annotation.Eq;
 import io.github.core.queryx.annotation.In;
 import io.github.core.queryx.annotation.Like;
+import io.github.core.queryx.annotation.Or;
 import io.github.core.queryx.annotation.OrderBy;
 import io.github.core.queryx.support.BasePageQuery;
 import lombok.Data;
@@ -92,4 +93,12 @@ public class UserPageQuery extends BasePageQuery {
      */
     @Between("create_time")
     private BetweenValue createTime;
+    
+    /**
+     * OR 组合查询 - 关键词搜索
+     * 同时匹配 username 和 email 字段
+     * 生成 SQL：AND (username LIKE '%keyword%' OR email LIKE '%keyword%')
+     */
+    @Or(fields = {"username", "email"}, operator = Or.Op.LIKE)
+    private String keyword;
 }

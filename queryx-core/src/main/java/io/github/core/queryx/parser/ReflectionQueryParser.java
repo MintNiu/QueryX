@@ -5,6 +5,7 @@ import io.github.core.queryx.annotation.BetweenValue;
 import io.github.core.queryx.annotation.Eq;
 import io.github.core.queryx.annotation.In;
 import io.github.core.queryx.annotation.Like;
+import io.github.core.queryx.annotation.Or;
 import io.github.core.queryx.annotation.OrderBy;
 import io.github.core.queryx.metadata.QueryClassMetadata;
 import io.github.core.queryx.metadata.QueryClassMetadata.FieldBinding;
@@ -13,6 +14,7 @@ import io.github.core.queryx.metadata.QueryOperator;
 
 import java.lang.reflect.Field;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
@@ -67,6 +69,7 @@ public class ReflectionQueryParser implements QueryParser {
                 metadata.setOp(binding.getOp());
                 metadata.setLikePrefix(binding.isLikePrefix());
                 metadata.setLikeSuffix(binding.isLikeSuffix());
+                metadata.setOrFields(binding.getOrFields());
                 result.add(metadata);
                 
             } catch (IllegalAccessException e) {
@@ -90,7 +93,7 @@ public class ReflectionQueryParser implements QueryParser {
             if (eq != null) {
                 String fieldName = eq.value().trim().isEmpty() ? field.getName() : eq.value();
                 QueryOperator operator = convertEqOpToOperator(eq.op(), eq.not());
-                bindings.add(new FieldBinding(field, fieldName, operator, false, false, eq.not(), eq.op()));
+                bindings.add(new FieldBinding(field, fieldName, operator, false, false, eq.not(), eq.op(), null));
                 continue;
             }
             
@@ -98,7 +101,7 @@ public class ReflectionQueryParser implements QueryParser {
             if (like != null) {
                 String fieldName = like.value().trim().isEmpty() ? field.getName() : like.value();
                 QueryOperator operator = like.not() ? QueryOperator.NOT_LIKE : QueryOperator.LIKE;
-                bindings.add(new FieldBinding(field, fieldName, operator, like.likePrefix(), like.likeSuffix(), like.not(), null));
+                bindings.add(new FieldBinding(field, fieldName, operator, like.likePrefix(), like.likeSuffix(), like.not(), null, null));
                 continue;
             }
             
@@ -106,20 +109,28 @@ public class ReflectionQueryParser implements QueryParser {
             if (in != null) {
                 String fieldName = in.value().trim().isEmpty() ? field.getName() : in.value();
                 QueryOperator operator = in.not() ? QueryOperator.NOT_IN : QueryOperator.IN;
-                bindings.add(new FieldBinding(field, fieldName, operator, false, false, in.not(), null));
+                bindings.add(new FieldBinding(field, fieldName, operator, false, false, in.not(), null, null));
                 continue;
             }
             
             Between between = field.getAnnotation(Between.class);
             if (between != null) {
                 String fieldName = between.value().trim().isEmpty() ? field.getName() : between.value();
-                bindings.add(new FieldBinding(field, fieldName, QueryOperator.BETWEEN, false, false, false, null));
+                bindings.add(new FieldBinding(field, fieldName, QueryOperator.BETWEEN, false, false, false, null, null));
                 continue;
             }
             
             OrderBy orderBy = field.getAnnotation(OrderBy.class);
             if (orderBy != null) {
-                bindings.add(new FieldBinding(field, "_orderBy", QueryOperator.ORDER_BY, false, false, false, null));
+                bindings.add(new FieldBinding(field, "_orderBy", QueryOperator.ORDER_BY, false, false, false, null, null));
+                continue;
+            }
+            
+            // @Or 注解：OR 组合查询
+            Or or = field.getAnnotation(Or.class);
+            if (or != null) {
+                List<String> orFields = Arrays.asList(or.fields());
+                bindings.add(new FieldBinding(field, "_orGroup", QueryOperator.OR_GROUP, false, false, false, null, orFields));
             }
         }
         

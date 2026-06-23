@@ -76,12 +76,19 @@ public class QueryXExceptionHandler {
      * 处理其他所有异常
      * <p>场景：未预期的系统异常。</p>
      * <p>响应：状态码 500，返回通用错误消息（不暴露具体异常信息）。</p>
+     * <p>注意：静态资源 404（如 favicon.ico）不记录 ERROR 日志。</p>
      * 
      * @param e 异常对象
      * @return 系统错误响应
      */
     @ExceptionHandler(Exception.class)
     public Result<Void> handleException(Exception e) {
+        // 静态资源 404（如 /favicon.ico）不记录 ERROR 日志
+        String exClassName = e.getClass().getName();
+        if (exClassName.contains("NoResourceFound") || exClassName.contains("ResourceNotFound")) {
+            log.debug("[QueryX] 资源未找到: {}", e.getMessage());
+            return Result.error(404, "资源未找到");
+        }
         log.error("[QueryX] 系统异常: ", e);
         return Result.error("系统内部错误，请稍后再试");
     }

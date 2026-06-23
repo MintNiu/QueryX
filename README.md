@@ -401,6 +401,8 @@ queryx:
 * ✅ **分页参数自动校验**（current ≥ 1, 1 ≤ size ≤ maxPageSize，可配置）
 * ✅ **全局异常处理器**（自动注册，统一 JSON 响应，可开关）
 * ✅ **统一响应结果**（Result 类，标准化 API 响应格式）
+* ✅ **查询缓存优化**（ConcurrentHashMap 缓存类元数据，避免重复反射扫描）
+* ✅ **Lombok 注解简化**（全面使用 @Data/@Getter 替代手写 getter/setter）
 
 ### 版本信息
 * **Spring Boot**: 3.2.5
@@ -428,6 +430,9 @@ queryx:
 * [x] Spring Boot Starter 自动配置
 * [x] 完整的测试示例项目
 * [x] MyBatis Plus 分页插件配置
+* [x] **查询缓存优化**（ReflectionQueryParser 类级别元数据缓存）
+* [x] **Lombok 注解简化**（全面使用 @Data/@Getter 替代手写 getter/setter）
+* [x] **复杂条件嵌套**（@Or 注解，支持 OR/AND 组合查询）
 
 ### 开发中 🚧
 
@@ -436,8 +441,6 @@ queryx:
 * [ ] 数据权限控制
 * [ ] 多租户支持
 * [ ] Kotlin DSL
-* [ ] 查询缓存优化
-* [ ] 复杂条件嵌套（OR/AND 组合）
 
 ## Project Structure
 
@@ -449,7 +452,8 @@ queryx/
 │   │   ├── @Like                         # 模糊查询（支持前后缀、not 取反）
 │   │   ├── @In                           # 集合查询（支持 not 取反）
 │   │   ├── @Between                      # 范围查询
-│   │   └── @OrderBy                      # 动态排序（多字段排序）
+│   │   ├── @OrderBy                      # 动态排序（多字段排序）
+│   │   └── @Or                           # OR 组合查询（多字段 OR 条件）
 │   ├── builder/                          # Wrapper 构建器
 │   │   ├── WrapperBuilder                # 接口定义
 │   │   └── DefaultWrapperBuilder         # 默认实现（支持白名单验证）

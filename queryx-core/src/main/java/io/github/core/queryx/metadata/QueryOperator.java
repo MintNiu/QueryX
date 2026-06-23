@@ -18,5 +18,6 @@ public enum QueryOperator {
     LT,         // 小于 <
     GE,         // 大于等于 >=
     LE,         // 小于等于 <=
-    ORDER_BY    // 排序
+    ORDER_BY,   // 排序
+    OR_GROUP    // OR 组合查询组
 }

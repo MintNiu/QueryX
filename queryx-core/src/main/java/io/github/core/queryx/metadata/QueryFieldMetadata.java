@@ -4,6 +4,8 @@ import io.github.core.queryx.annotation.Eq;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
+
 /**
  * 查询字段元数据
  * 
@@ -20,6 +22,11 @@ public class QueryFieldMetadata {
     private boolean likeSuffix;
     private boolean not;
     private Eq.Op op;
+    
+    /**
+     * OR 组合字段列表（用于 OR_GROUP 操作符）
+     */
+    private List<String> orFields;
 
     public QueryFieldMetadata(String fieldName, Object value, QueryOperator operator) {
         this.fieldName = fieldName;
