@@ -5,9 +5,9 @@ spring:
   application:
     name: queryx-example
   datasource:
-    url: jdbc:mysql://39.107.69.23:3306/QueryX_db?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai
+    url: jdbc:mysql://172.0.0.1:3306/QueryX_db?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai
     username: root
-    password: Bafan@2026xixunxun
+    password: root
     driver-class-name: com.mysql.cj.jdbc.Driver
 
 # QueryX 配置
