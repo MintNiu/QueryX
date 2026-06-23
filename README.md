@@ -346,6 +346,55 @@ return Result.badRequest("参数错误");
 return Result.error(503, "服务不可用");
 ```
 
+### 数据权限控制（新功能）⭐
+
+通过 `@DataScope` 注解 + `DataPermissionProvider` 接口，自动追加数据权限条件，实现行级权限控制。
+
+**使用步骤**：
+
+**1. 在查询 DTO 上标注 `@DataScope`**
+```java
+@Data
+@DataScope(field = "department_id", type = DataScope.Type.EQ)
+public class UserPageQuery extends BasePageQuery {
+    @Like("username")
+    private String username;
+}
+```
+
+**2. 实现 `DataPermissionProvider` 接口**
+```java
+@Component
+public class UserDataPermissionProvider implements DataPermissionProvider {
+    @Override
+    public Object getPermissionValue() {
+        // 从当前登录用户获取部门 ID
+        return SecurityContextHolder.getContext().getDepartmentId();
+    }
+}
+```
+
+**生成 SQL**：
+```sql
+-- 普通用户（department_id = 3）
+WHERE username LIKE '%张%' AND department_id = 3
+
+-- 管理员（Provider 返回 null 则不限制）
+WHERE username LIKE '%张%'
+```
+
+**支持的操作类型**：
+
+| Type | 说明 | 生成 SQL |
+|------|------|----------|
+| `EQ` | 精确匹配 | `WHERE dept_id = ?` |
+| `IN` | 集合匹配 | `WHERE dept_id IN (?)` |
+
+**设计要点**：
+- `DataPermissionProvider` 返回 `null` → 不追加权限条件（管理员场景）
+- `DataPermissionProvider` 未注册 → 不启用数据权限（向后兼容）
+- `@DataScope` 注解使用 `ConcurrentHashMap` 缓存，避免重复反射
+
 ## Configuration
 
 所有配置项均可在 `application.yml` 中设置，以下为完整配置参考：
@@ -403,6 +452,7 @@ queryx:
 * ✅ **统一响应结果**（Result 类，标准化 API 响应格式）
 * ✅ **查询缓存优化**（ConcurrentHashMap 缓存类元数据，避免重复反射扫描）
 * ✅ **Lombok 注解简化**（全面使用 @Data/@Getter 替代手写 getter/setter）
+* ✅ **数据权限控制**（@DataScope 注解 + DataPermissionProvider 接口，行级权限）
 
 ### 版本信息
 * **Spring Boot**: 3.2.5
@@ -433,12 +483,12 @@ queryx:
 * [x] **查询缓存优化**（ReflectionQueryParser 类级别元数据缓存）
 * [x] **Lombok 注解简化**（全面使用 @Data/@Getter 替代手写 getter/setter）
 * [x] **复杂条件嵌套**（@Or 注解，支持 OR/AND 组合查询）
+* [x] **数据权限控制**（@DataScope 注解 + DataPermissionProvider 接口，行级权限）
 
 ### 开发中 🚧
 
 ### 计划中 📋
 * [ ] 多表 Join 查询
-* [ ] 数据权限控制
 * [ ] 多租户支持
 * [ ] Kotlin DSL
 
@@ -453,7 +503,8 @@ queryx/
 │   │   ├── @In                           # 集合查询（支持 not 取反）
 │   │   ├── @Between                      # 范围查询
 │   │   ├── @OrderBy                      # 动态排序（多字段排序）
-│   │   └── @Or                           # OR 组合查询（多字段 OR 条件）
+│   │   ├── @Or                           # OR 组合查询（多字段 OR 条件）
+│   │   └── @DataScope                    # 数据权限控制（行级权限）
 │   ├── builder/                          # Wrapper 构建器
 │   │   ├── WrapperBuilder                # 接口定义
 │   │   └── DefaultWrapperBuilder         # 默认实现（支持白名单验证）
@@ -464,7 +515,8 @@ queryx/
 │   │   └── OrderByResult                 # 验证结果（过滤后的排序+警告）
 │   └── support/                          # 支持类
 │       ├── BasePageQuery                 # 分页查询基类（含参数校验）
-│       └── Result                        # 统一响应结果
+│       ├── Result                        # 统一响应结果
+│       └── DataPermissionProvider        # 数据权限提供者接口
 ├── queryx-spring-boot-autoconfigure/     # Spring Boot 自动配置
 │   ├── QueryXAutoConfiguration           # 自动配置类（支持全部配置项）
 │   ├── QueryXProperties                  # 配置属性（enabled/maxPageSize 等）

@@ -3,10 +3,12 @@ package io.github.core.queryx.builder;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import io.github.core.queryx.annotation.BetweenValue;
+import io.github.core.queryx.annotation.DataScope;
 import io.github.core.queryx.metadata.QueryFieldMetadata;
 import io.github.core.queryx.metadata.QueryOperator;
 import io.github.core.queryx.parser.QueryParser;
 import io.github.core.queryx.support.BasePageQuery;
+import io.github.core.queryx.support.DataPermissionProvider;
 import io.github.core.queryx.validator.OrderByResult;
 import io.github.core.queryx.validator.OrderByValidator;
 import lombok.Setter;
@@ -15,6 +17,7 @@ import lombok.extern.slf4j.Slf4j;
 import java.util.Collection;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * 默认的 Wrapper 构建器实现
@@ -51,10 +54,6 @@ public class DefaultWrapperBuilder implements WrapperBuilder {
 
     /**
      * 排序字段白名单验证器（可选）
-     * -- SETTER --
-     * 设置排序字段白名单验证器
-     *
-     * @param validator 验证器
      */
     @Setter
     private OrderByValidator orderByValidator;
@@ -65,6 +64,17 @@ public class DefaultWrapperBuilder implements WrapperBuilder {
      * <p>可通过 {@link #setMaxPageSize(Long)} 或配置 {@code queryx.maxPageSize} 修改。</p>
      */
     private Long maxPageSize = 500L;
+
+    /**
+     * 数据权限提供者（可选）
+     */
+    @Setter
+    private DataPermissionProvider dataPermissionProvider;
+
+    /**
+     * @DataScope 注解缓存（按查询类缓存，避免每次 build() 重复反射查找）
+     */
+    private final ConcurrentHashMap<Class<?>, DataScope> dataScopeCache = new ConcurrentHashMap<>();
 
     /**
      * 基础构造函数
@@ -106,6 +116,7 @@ public class DefaultWrapperBuilder implements WrapperBuilder {
      *
      * <p>解析查询对象上的注解，生成对应的 WHERE 条件。</p>
      * <p>注意：@OrderBy 注解的字段会被跳过，不会作为查询条件。</p>
+     * <p>如果查询对象标注了 @DataScope 且配置了 DataPermissionProvider，会自动追加数据权限条件。</p>
      *
      * @param query 查询对象
      * @return MyBatis Plus QueryWrapper
@@ -130,6 +141,9 @@ public class DefaultWrapperBuilder implements WrapperBuilder {
                 applyCondition(wrapper, metadata);
             }
         }
+
+        // 应用数据权限条件
+        applyDataPermission(wrapper, query);
 
         return wrapper;
     }
@@ -397,6 +411,59 @@ public class DefaultWrapperBuilder implements WrapperBuilder {
         } else {
             // 默认使用 LIKE（最常见的搜索场景）
             wrapper.like(fieldName, strValue);
+        }
+    }
+    
+    /**
+     * 应用数据权限条件
+     * 
+     * <p>如果查询对象标注了 @DataScope 且配置了 DataPermissionProvider，
+     * 会自动追加数据权限条件。</p>
+     * <p>使用 ConcurrentHashMap 缓存 @DataScope 注解，避免每次 build() 重复反射查找。</p>
+     * 
+     * @param wrapper QueryWrapper
+     * @param query 查询对象
+     */
+    private <T> void applyDataPermission(QueryWrapper<T> wrapper, Object query) {
+        // 如果没有配置 DataPermissionProvider，直接返回
+        if (dataPermissionProvider == null) {
+            return;
+        }
+        
+        // 从缓存获取 @DataScope 注解（首次调用时解析并缓存）
+        DataScope dataScope = dataScopeCache.computeIfAbsent(
+                query.getClass(), clazz -> clazz.getAnnotation(DataScope.class));
+        
+        if (dataScope == null) {
+            return;
+        }
+        
+        // 获取权限值
+        Object permissionValue = dataPermissionProvider.getPermissionValue();
+        
+        // 如果返回 null，表示不限制（管理员场景）
+        if (permissionValue == null) {
+            return;
+        }
+        
+        String field = dataScope.field();
+        DataScope.Type type = dataScope.type();
+        
+        // 根据操作类型生成不同的条件
+        switch (type) {
+            case EQ:
+                wrapper.eq(field, permissionValue);
+                break;
+            case IN:
+                if (permissionValue instanceof Collection) {
+                    wrapper.in(field, (Collection<?>) permissionValue);
+                } else {
+                    // 单个值也支持 IN 查询
+                    wrapper.in(field, permissionValue);
+                }
+                break;
+            default:
+                wrapper.eq(field, permissionValue);
         }
     }
 }

@@ -2,6 +2,7 @@ package com.example.queryx;
 
 import io.github.core.queryx.annotation.Between;
 import io.github.core.queryx.annotation.BetweenValue;
+import io.github.core.queryx.annotation.DataScope;
 import io.github.core.queryx.annotation.Eq;
 import io.github.core.queryx.annotation.In;
 import io.github.core.queryx.annotation.Like;
@@ -21,6 +22,7 @@ import java.util.List;
  */
 @Data
 @EqualsAndHashCode(callSuper = true)
+@DataScope(field = "status", type = DataScope.Type.EQ)  // 添加这行
 public class UserPageQuery extends BasePageQuery {
     
     /**

@@ -2,6 +2,7 @@ package io.github.core.queryx.builder;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import io.github.core.queryx.support.DataPermissionProvider;
 
 /**
  * Wrapper 构建器接口
@@ -42,4 +43,11 @@ public interface WrapperBuilder {
      * @param orderBy 排序字符串，格式："id:desc,age:asc"
      */
     <T> void applyOrder(QueryWrapper<T> wrapper, String orderBy);
+    
+    /**
+     * 设置数据权限提供者
+     * 
+     * @param provider 数据权限提供者
+     */
+    void setDataPermissionProvider(DataPermissionProvider provider);
 }

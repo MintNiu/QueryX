@@ -4,7 +4,9 @@ import io.github.core.queryx.builder.DefaultWrapperBuilder;
 import io.github.core.queryx.builder.WrapperBuilder;
 import io.github.core.queryx.parser.QueryParser;
 import io.github.core.queryx.parser.ReflectionQueryParser;
+import io.github.core.queryx.support.DataPermissionProvider;
 import io.github.core.queryx.validator.OrderByValidator;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -69,12 +71,14 @@ public class QueryXAutoConfiguration {
      * <ul>
      *   <li>排序字段白名单验证（orderByWhitelist）</li>
      *   <li>分页最大数量限制（maxPageSize）</li>
+     *   <li>数据权限提供者（如果存在）</li>
      * </ul>
      */
     @Bean
     @ConditionalOnMissingBean
     @ConditionalOnProperty(prefix = "queryx", name = "enabled", havingValue = "true", matchIfMissing = true)
-    public WrapperBuilder wrapperBuilder(QueryParser queryParser) {
+    public WrapperBuilder wrapperBuilder(QueryParser queryParser,
+                                         @Autowired(required = false) DataPermissionProvider dataPermissionProvider) {
         DefaultWrapperBuilder builder = new DefaultWrapperBuilder(queryParser);
         
         // 配置排序字段白名单
@@ -86,6 +90,11 @@ public class QueryXAutoConfiguration {
         
         // 配置分页最大数量（默认 500）
         builder.setMaxPageSize(queryXProperties.getMaxPageSize());
+        
+        // 配置数据权限提供者（如果存在）
+        if (dataPermissionProvider != null) {
+            builder.setDataPermissionProvider(dataPermissionProvider);
+        }
         
         return builder;
     }
