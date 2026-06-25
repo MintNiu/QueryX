@@ -5,14 +5,19 @@ spring:
   application:
     name: queryx-example
   datasource:
-    url: jdbc:mysql://172.0.0.1:3306/QueryX_db?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai
+    url: jdbc:mysql://39.107.69.23:3306/QueryX_db?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai
     username: root
-    password: root
+    password: Bafan@2026xixunxun
     driver-class-name: com.mysql.cj.jdbc.Driver
 
 # QueryX 配置
 queryx:
+  # 组件开启
   enabled: true
+  # 开启多租户
+  tenantEnabled: true
+  # 用 status 模拟租户字段
+  tenantField: tenant_id
 
   # 全局异常处理开关（关闭后请自己重新管理）
   exceptionHandlerEnabled: true

@@ -9,12 +9,14 @@ import io.github.core.queryx.metadata.QueryOperator;
 import io.github.core.queryx.parser.QueryParser;
 import io.github.core.queryx.support.BasePageQuery;
 import io.github.core.queryx.support.DataPermissionProvider;
+import io.github.core.queryx.support.TenantProvider;
 import io.github.core.queryx.validator.OrderByResult;
 import io.github.core.queryx.validator.OrderByValidator;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -27,22 +29,9 @@ import java.util.concurrent.ConcurrentHashMap;
  *   <li>将查询 DTO 对象解析为 MyBatis Plus 的 {@link QueryWrapper}</li>
  *   <li>支持分页对象构建，并自动限制每页数量不超过 {@link #maxPageSize}</li>
  *   <li>支持多字段动态排序，可选配合 {@link OrderByValidator} 进行白名单验证</li>
+ *   <li>支持数据权限控制（@DataScope + DataPermissionProvider）</li>
+ *   <li>支持多租户（TenantProvider，全局生效）</li>
  * </ul>
- *
- * <h3>使用示例：</h3>
- * <pre>
- * // 1. 构建查询条件
- * QueryWrapper&lt;User&gt; wrapper = wrapperBuilder.build(query);
- *
- * // 2. 构建分页对象（自动限制每页数量）
- * Page&lt;User&gt; page = wrapperBuilder.buildPage(query);
- *
- * // 3. 构建包含排序的查询 Wrapper（用于分页查询）
- * QueryWrapper&lt;User&gt; pageWrapper = wrapperBuilder.buildPageWrapper(query);
- *
- * // 4. 执行分页查询
- * userService.page(page, pageWrapper);
- * </pre>
  *
  * @author MintNiu
  * @since 0.1.0
@@ -60,8 +49,6 @@ public class DefaultWrapperBuilder implements WrapperBuilder {
 
     /**
      * 分页最大每页数量（默认 500）
-     * <p>超过此值的每页数量将被自动调整，并输出警告日志。</p>
-     * <p>可通过 {@link #setMaxPageSize(Long)} 或配置 {@code queryx.maxPageSize} 修改。</p>
      */
     private Long maxPageSize = 500L;
 
@@ -75,6 +62,17 @@ public class DefaultWrapperBuilder implements WrapperBuilder {
      * @DataScope 注解缓存（按查询类缓存，避免每次 build() 重复反射查找）
      */
     private final ConcurrentHashMap<Class<?>, DataScope> dataScopeCache = new ConcurrentHashMap<>();
+
+    /**
+     * 租户提供者（可选）
+     */
+    @Setter
+    private TenantProvider tenantProvider;
+
+    /**
+     * 租户字段名（默认 tenant_id）
+     */
+    private String tenantField = "tenant_id";
 
     /**
      * 基础构造函数
@@ -117,6 +115,7 @@ public class DefaultWrapperBuilder implements WrapperBuilder {
      * <p>解析查询对象上的注解，生成对应的 WHERE 条件。</p>
      * <p>注意：@OrderBy 注解的字段会被跳过，不会作为查询条件。</p>
      * <p>如果查询对象标注了 @DataScope 且配置了 DataPermissionProvider，会自动追加数据权限条件。</p>
+     * <p>如果配置了 TenantProvider，会自动追加租户条件（全局生效）。</p>
      *
      * @param query 查询对象
      * @return MyBatis Plus QueryWrapper
@@ -128,6 +127,9 @@ public class DefaultWrapperBuilder implements WrapperBuilder {
             return wrapper;
         }
 
+        // 跟踪已应用的字段名，用于租户/数据权限去重
+        Set<String> appliedFields = new HashSet<>();
+
         List<QueryFieldMetadata> metadataList = queryParser.parse(query);
         for (QueryFieldMetadata metadata : metadataList) {
             // 跳过排序字段（不是查询条件）
@@ -136,14 +138,22 @@ public class DefaultWrapperBuilder implements WrapperBuilder {
             }
             // 处理 OR 组合查询
             if (metadata.getOperator() == QueryOperator.OR_GROUP) {
+                List<String> orFields = metadata.getOrFields();
+                if (orFields != null) {
+                    appliedFields.addAll(orFields);
+                }
                 applyOrGroupCondition(wrapper, metadata);
             } else {
+                appliedFields.add(metadata.getFieldName());
                 applyCondition(wrapper, metadata);
             }
         }
 
         // 应用数据权限条件
-        applyDataPermission(wrapper, query);
+        applyDataPermission(wrapper, query, appliedFields);
+
+        // 应用租户条件（自动去重）
+        applyTenantCondition(wrapper, appliedFields);
 
         return wrapper;
     }
@@ -330,18 +340,13 @@ public class DefaultWrapperBuilder implements WrapperBuilder {
         boolean likePrefix = metadata.isLikePrefix();
         boolean likeSuffix = metadata.isLikeSuffix();
 
-        // 优先判断最常见情况：前后都加 %（默认配置）
         if (likePrefix && likeSuffix) {
-            // 前后都加 %：like(%value%) → 模糊匹配（最常用）
             wrapper.like(fieldName, strValue);
         } else if (likePrefix) {
-            // 只加前缀 %：likeRight(value%) → 匹配以 value 开头的
             wrapper.likeRight(fieldName, strValue);
         } else if (likeSuffix) {
-            // 只加后缀 %：likeLeft(%value) → 匹配以 value 结尾的
             wrapper.likeLeft(fieldName, strValue);
         } else {
-            // 前后都不加 %：精确匹配（很少用）
             wrapper.like(fieldName, strValue);
         }
     }
@@ -352,18 +357,13 @@ public class DefaultWrapperBuilder implements WrapperBuilder {
         boolean likePrefix = metadata.isLikePrefix();
         boolean likeSuffix = metadata.isLikeSuffix();
 
-        // 优先判断最常见情况：前后都加 %（默认配置）
         if (likePrefix && likeSuffix) {
-            // 前后都加 %：notLike(%value%) → 模糊不匹配
             wrapper.notLike(fieldName, strValue);
         } else if (likePrefix) {
-            // 只加前缀 %：notLike(value%) → 不以 value 开头
             wrapper.notLikeRight(fieldName, strValue);
         } else if (likeSuffix) {
-            // 只加后缀 %：notLike(%value) → 不以 value 结尾
             wrapper.notLikeLeft(fieldName, strValue);
         } else {
-            // 前后都不加 %：精确不匹配
             wrapper.notLike(fieldName, strValue);
         }
     }
@@ -384,7 +384,6 @@ public class DefaultWrapperBuilder implements WrapperBuilder {
             return;
         }
 
-        // 使用 and() 包裹 OR 组：AND (field1 OP value OR field2 OP value ...)
         wrapper.and(w -> {
             for (int i = 0; i < orFields.size(); i++) {
                 String fieldName = orFields.get(i);
@@ -401,15 +400,11 @@ public class DefaultWrapperBuilder implements WrapperBuilder {
      */
     private <T> void applyOrGroupFieldCondition(QueryWrapper<T> wrapper, String fieldName,
                                                 Object value, QueryFieldMetadata metadata) {
-        // 根据 @Or 注解的操作符类型应用对应条件
-        // 目前支持 EQ、LIKE、IN
         String strValue = value.toString();
 
-        // 根据值的类型和注解配置决定使用哪种操作符
         if (value instanceof Collection) {
             wrapper.in(fieldName, (Collection<?>) value);
         } else {
-            // 默认使用 LIKE（最常见的搜索场景）
             wrapper.like(fieldName, strValue);
         }
     }
@@ -418,19 +413,18 @@ public class DefaultWrapperBuilder implements WrapperBuilder {
      * 应用数据权限条件
      * 
      * <p>如果查询对象标注了 @DataScope 且配置了 DataPermissionProvider，
-     * 会自动追加数据权限条件。</p>
+     * 会自动追加数据权限条件。如果查询条件已包含同名字段，则跳过。</p>
      * <p>使用 ConcurrentHashMap 缓存 @DataScope 注解，避免每次 build() 重复反射查找。</p>
      * 
      * @param wrapper QueryWrapper
      * @param query 查询对象
+     * @param appliedFields 已应用的字段名集合
      */
-    private <T> void applyDataPermission(QueryWrapper<T> wrapper, Object query) {
-        // 如果没有配置 DataPermissionProvider，直接返回
+    private <T> void applyDataPermission(QueryWrapper<T> wrapper, Object query, Set<String> appliedFields) {
         if (dataPermissionProvider == null) {
             return;
         }
         
-        // 从缓存获取 @DataScope 注解（首次调用时解析并缓存）
         DataScope dataScope = dataScopeCache.computeIfAbsent(
                 query.getClass(), clazz -> clazz.getAnnotation(DataScope.class));
         
@@ -438,18 +432,21 @@ public class DefaultWrapperBuilder implements WrapperBuilder {
             return;
         }
         
-        // 获取权限值
+        String field = dataScope.field();
+        
+        // 如果查询条件已包含该字段，跳过数据权限
+        if (appliedFields.contains(field)) {
+            return;
+        }
+        
         Object permissionValue = dataPermissionProvider.getPermissionValue();
         
-        // 如果返回 null，表示不限制（管理员场景）
         if (permissionValue == null) {
             return;
         }
         
-        String field = dataScope.field();
         DataScope.Type type = dataScope.type();
         
-        // 根据操作类型生成不同的条件
         switch (type) {
             case EQ:
                 wrapper.eq(field, permissionValue);
@@ -458,12 +455,56 @@ public class DefaultWrapperBuilder implements WrapperBuilder {
                 if (permissionValue instanceof Collection) {
                     wrapper.in(field, (Collection<?>) permissionValue);
                 } else {
-                    // 单个值也支持 IN 查询
                     wrapper.in(field, permissionValue);
                 }
                 break;
             default:
                 wrapper.eq(field, permissionValue);
+        }
+    }
+    
+    /**
+     * 应用租户条件
+     * 
+     * <p>如果配置了 TenantProvider，会自动追加租户条件（全局生效）。</p>
+     * <p>如果查询条件已包含租户字段，则跳过（避免重复条件）。</p>
+     * <p>返回 null 表示不限制（超级管理员场景）。</p>
+     * 
+     * @param wrapper QueryWrapper
+     * @param appliedFields 已应用的字段名集合
+     */
+    private <T> void applyTenantCondition(QueryWrapper<T> wrapper, Set<String> appliedFields) {
+        if (tenantProvider == null) {
+            return;
+        }
+        
+        // 如果查询条件已包含租户字段，跳过租户条件
+        if (appliedFields.contains(tenantField)) {
+            return;
+        }
+        
+        Object tenantId = tenantProvider.getTenantId();
+        
+        if (tenantId == null) {
+            return;
+        }
+        
+        if (tenantId instanceof Collection) {
+            wrapper.in(tenantField, (Collection<?>) tenantId);
+        } else {
+            wrapper.eq(tenantField, tenantId);
+        }
+    }
+    
+    /**
+     * 设置租户字段名
+     *
+     * @param tenantField 租户字段名
+     */
+    @Override
+    public void setTenantField(String tenantField) {
+        if (tenantField != null && !tenantField.trim().isEmpty()) {
+            this.tenantField = tenantField;
         }
     }
 }

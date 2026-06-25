@@ -22,7 +22,6 @@ import java.util.List;
  */
 @Data
 @EqualsAndHashCode(callSuper = true)
-@DataScope(field = "status", type = DataScope.Type.EQ)  // 添加这行
 public class UserPageQuery extends BasePageQuery {
     
     /**

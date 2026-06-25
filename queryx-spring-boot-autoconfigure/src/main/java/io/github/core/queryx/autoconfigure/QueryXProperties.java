@@ -21,6 +21,8 @@ import java.util.List;
  *     - create_time
  *   maxPageSize: 500                     # 分页最大每页数量
  *   exceptionHandlerEnabled: true        # 是否启用全局异常处理器
+ *   tenantEnabled: true                  # 是否启用多租户
+ *   tenantField: tenant_id               # 租户字段名（默认 tenant_id）
  * </pre>
  * 
  * @author MintNiu
@@ -65,6 +67,19 @@ public class QueryXProperties {
      */
     private boolean exceptionHandlerEnabled = true;
 
+    /**
+     * 是否启用多租户
+     * <p>启用后，所有查询自动追加租户条件（需配合 TenantProvider 使用）。</p>
+     * <p>默认：false</p>
+     */
+    private boolean tenantEnabled = false;
+
+    /**
+     * 租户字段名（数据库字段）
+     * <p>默认：tenant_id</p>
+     */
+    private String tenantField = "tenant_id";
+
     public boolean isEnabled() {
         return enabled;
     }
@@ -103,5 +118,21 @@ public class QueryXProperties {
 
     public void setExceptionHandlerEnabled(boolean exceptionHandlerEnabled) {
         this.exceptionHandlerEnabled = exceptionHandlerEnabled;
+    }
+
+    public boolean isTenantEnabled() {
+        return tenantEnabled;
+    }
+
+    public void setTenantEnabled(boolean tenantEnabled) {
+        this.tenantEnabled = tenantEnabled;
+    }
+
+    public String getTenantField() {
+        return tenantField;
+    }
+
+    public void setTenantField(String tenantField) {
+        this.tenantField = tenantField;
     }
 }

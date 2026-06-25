@@ -395,6 +395,50 @@ WHERE username LIKE '%张%'
 - `DataPermissionProvider` 未注册 → 不启用数据权限（向后兼容）
 - `@DataScope` 注解使用 `ConcurrentHashMap` 缓存，避免重复反射
 
+### 多租户支持（新功能）⭐
+
+通过 `TenantProvider` 接口 + 配置项，**全局自动**追加租户条件，无需在 DTO 上加注解。
+
+**与数据权限的区别**：
+
+| 特性 | 数据权限（@DataScope） | 多租户（TenantProvider） |
+|------|----------------------|------------------------|
+| 作用范围 | 单个 DTO（需标注 @DataScope） | 全局（所有查询自动生效） |
+| 配置方式 | 注解 `field` 属性 | `queryx.tenantField` 配置 |
+| 适用场景 | 行级权限（部门、角色等） | 多租户数据隔离 |
+
+**使用步骤**：
+
+**1. 配置 `application.yml`**
+```yaml
+queryx:
+  tenantEnabled: true        # 启用多租户
+  tenantField: tenant_id     # 租户字段名（默认 tenant_id）
+```
+
+**2. 实现 `TenantProvider` 接口**
+```java
+@Component
+public class MyTenantProvider implements TenantProvider {
+    @Override
+    public Object getTenantId() {
+        return TenantContextHolder.getCurrentTenantId();
+    }
+}
+```
+
+**生成 SQL**：
+```sql
+-- 所有查询自动追加租户条件
+-- 用户请求：WHERE username LIKE '%张%' AND status = 1
+-- 实际 SQL：WHERE username LIKE '%张%' AND status = 1 AND tenant_id = 3
+```
+
+**设计要点**：
+- `TenantProvider` 返回 `null` → 不追加租户条件（超级管理员）
+- `TenantProvider` 未注册或 `tenantEnabled=false` → 不启用（向后兼容）
+- 多租户条件在所有查询条件之后追加，可与数据权限同时使用
+
 ## Configuration
 
 所有配置项均可在 `application.yml` 中设置，以下为完整配置参考：
@@ -421,6 +465,12 @@ queryx:
 
   # 分页最大每页数量（默认 500，超过自动调整并输出警告日志）
   maxPageSize: 500
+
+  # 是否启用多租户（默认 false）
+  tenantEnabled: true
+
+  # 租户字段名（默认 tenant_id）
+  tenantField: tenant_id
 ```
 
 ## Features
@@ -453,6 +503,7 @@ queryx:
 * ✅ **查询缓存优化**（ConcurrentHashMap 缓存类元数据，避免重复反射扫描）
 * ✅ **Lombok 注解简化**（全面使用 @Data/@Getter 替代手写 getter/setter）
 * ✅ **数据权限控制**（@DataScope 注解 + DataPermissionProvider 接口，行级权限）
+* ✅ **多租户支持**（TenantProvider 接口，全局自动追加租户条件）
 
 ### 版本信息
 * **Spring Boot**: 3.2.5
@@ -484,12 +535,12 @@ queryx:
 * [x] **Lombok 注解简化**（全面使用 @Data/@Getter 替代手写 getter/setter）
 * [x] **复杂条件嵌套**（@Or 注解，支持 OR/AND 组合查询）
 * [x] **数据权限控制**（@DataScope 注解 + DataPermissionProvider 接口，行级权限）
+* [x] **多租户支持**（TenantProvider 接口，全局自动追加租户条件）
 
 ### 开发中 🚧
 
 ### 计划中 📋
 * [ ] 多表 Join 查询
-* [ ] 多租户支持
 * [ ] Kotlin DSL
 
 ## Project Structure
@@ -516,7 +567,8 @@ queryx/
 │   └── support/                          # 支持类
 │       ├── BasePageQuery                 # 分页查询基类（含参数校验）
 │       ├── Result                        # 统一响应结果
-│       └── DataPermissionProvider        # 数据权限提供者接口
+│       ├── DataPermissionProvider        # 数据权限提供者接口
+│       └── TenantProvider                # 租户 ID 提供者接口
 ├── queryx-spring-boot-autoconfigure/     # Spring Boot 自动配置
 │   ├── QueryXAutoConfiguration           # 自动配置类（支持全部配置项）
 │   ├── QueryXProperties                  # 配置属性（enabled/maxPageSize 等）

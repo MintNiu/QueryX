@@ -5,6 +5,7 @@ import io.github.core.queryx.builder.WrapperBuilder;
 import io.github.core.queryx.parser.QueryParser;
 import io.github.core.queryx.parser.ReflectionQueryParser;
 import io.github.core.queryx.support.DataPermissionProvider;
+import io.github.core.queryx.support.TenantProvider;
 import io.github.core.queryx.validator.OrderByValidator;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
@@ -72,13 +73,15 @@ public class QueryXAutoConfiguration {
      *   <li>排序字段白名单验证（orderByWhitelist）</li>
      *   <li>分页最大数量限制（maxPageSize）</li>
      *   <li>数据权限提供者（如果存在）</li>
+     *   <li>租户提供者（如果存在）</li>
      * </ul>
      */
     @Bean
     @ConditionalOnMissingBean
     @ConditionalOnProperty(prefix = "queryx", name = "enabled", havingValue = "true", matchIfMissing = true)
     public WrapperBuilder wrapperBuilder(QueryParser queryParser,
-                                         @Autowired(required = false) DataPermissionProvider dataPermissionProvider) {
+                                         @Autowired(required = false) DataPermissionProvider dataPermissionProvider,
+                                         @Autowired(required = false) TenantProvider tenantProvider) {
         DefaultWrapperBuilder builder = new DefaultWrapperBuilder(queryParser);
         
         // 配置排序字段白名单
@@ -94,6 +97,12 @@ public class QueryXAutoConfiguration {
         // 配置数据权限提供者（如果存在）
         if (dataPermissionProvider != null) {
             builder.setDataPermissionProvider(dataPermissionProvider);
+        }
+        
+        // 配置租户提供者（如果存在）
+        if (tenantProvider != null && queryXProperties.isTenantEnabled()) {
+            builder.setTenantProvider(tenantProvider);
+            builder.setTenantField(queryXProperties.getTenantField());
         }
         
         return builder;

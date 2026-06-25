@@ -3,6 +3,7 @@ package io.github.core.queryx.builder;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import io.github.core.queryx.support.DataPermissionProvider;
+import io.github.core.queryx.support.TenantProvider;
 
 /**
  * Wrapper 构建器接口
@@ -50,4 +51,18 @@ public interface WrapperBuilder {
      * @param provider 数据权限提供者
      */
     void setDataPermissionProvider(DataPermissionProvider provider);
+    
+    /**
+     * 设置租户提供者
+     * 
+     * @param provider 租户提供者
+     */
+    void setTenantProvider(TenantProvider provider);
+    
+    /**
+     * 设置租户字段名
+     * 
+     * @param tenantField 租户字段名（默认 tenant_id）
+     */
+    void setTenantField(String tenantField);
 }
