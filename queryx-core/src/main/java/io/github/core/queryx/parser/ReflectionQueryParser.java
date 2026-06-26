@@ -16,7 +16,10 @@ import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static java.lang.reflect.Modifier.isStatic;
@@ -32,9 +35,16 @@ import static java.lang.reflect.Modifier.isStatic;
 public class ReflectionQueryParser implements QueryParser {
 
     /**
-     * 类级别元数据缓存（线程安全）
+     * 类级别元数据缓存（线程安全，LRU 策略）
+     * <p>最大缓存 1000 个 DTO 类，超出后淘汰最久未使用的条目。</p>
      */
-    private static final ConcurrentHashMap<Class<?>, QueryClassMetadata> CLASS_CACHE = new ConcurrentHashMap<>();
+    private static final Map<Class<?>, QueryClassMetadata> CLASS_CACHE = Collections.synchronizedMap(
+            new LinkedHashMap<Class<?>, QueryClassMetadata>(16, 0.75f, true) {
+                @Override
+                protected boolean removeEldestEntry(Map.Entry<Class<?>, QueryClassMetadata> eldest) {
+                    return size() > 1000;
+                }
+            });
 
     @Override
     public List<QueryFieldMetadata> parse(Object query) {
@@ -43,8 +53,11 @@ public class ReflectionQueryParser implements QueryParser {
         }
         
         // 从缓存获取类级别元数据（首次调用时解析并缓存）
-        QueryClassMetadata classMeta = CLASS_CACHE.computeIfAbsent(
-                query.getClass(), this::parseClassMetadata);
+        QueryClassMetadata classMeta = CLASS_CACHE.get(query.getClass());
+        if (classMeta == null) {
+            classMeta = parseClassMetadata(query.getClass());
+            CLASS_CACHE.put(query.getClass(), classMeta);
+        }
         
         List<FieldBinding> bindings = classMeta.getBindings();
         // P2-5: 使用实际字段数预分配，避免默认 10 的浪费

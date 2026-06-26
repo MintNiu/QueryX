@@ -15,8 +15,12 @@ import io.github.core.queryx.validator.OrderByValidator;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -56,11 +60,18 @@ public class DefaultWrapperBuilder implements WrapperBuilder {
     private final DataPermissionProvider dataPermissionProvider;
 
     /**
-     * @DataScope 注解缓存（按查询类缓存，避免每次 build() 重复反射查找）
-     * <p>使用 Optional 包装，因为 ConcurrentHashMap 不允许 value 为 null，
+     * @DataScope 注解缓存（LRU 策略，避免每次 build() 重复反射查找）
+     * <p>最大缓存 1000 个 DTO 类，超出后淘汰最久未使用的条目。</p>
+     * <p>使用 Optional 包装，因为 Map 不允许 value 为 null，
      * 而部分 DTO 类可能未标注 @DataScope。</p>
      */
-    private final ConcurrentHashMap<Class<?>, java.util.Optional<DataScope>> dataScopeCache = new ConcurrentHashMap<>();
+    private final Map<Class<?>, Optional<DataScope>> dataScopeCache = Collections.synchronizedMap(
+            new LinkedHashMap<Class<?>, Optional<DataScope>>(16, 0.75f, true) {
+                @Override
+                protected boolean removeEldestEntry(Map.Entry<Class<?>, Optional<DataScope>> eldest) {
+                    return size() > 1000;
+                }
+            });
 
     /**
      * 租户提供者（可选）
@@ -490,10 +501,13 @@ public class DefaultWrapperBuilder implements WrapperBuilder {
             return;
         }
         
-        // 使用 Optional 包装，避免 ConcurrentHashMap 不允许 value 为 null 的问题
-        DataScope dataScope = dataScopeCache.computeIfAbsent(
-                query.getClass(), clazz -> java.util.Optional.ofNullable(clazz.getAnnotation(DataScope.class)))
-                .orElse(null);
+        // 使用 Optional 包装，避免 Map 不允许 value 为 null 的问题
+        Optional<DataScope> optional = dataScopeCache.get(query.getClass());
+        if (optional == null) {
+            optional = Optional.ofNullable(query.getClass().getAnnotation(DataScope.class));
+            dataScopeCache.put(query.getClass(), optional);
+        }
+        DataScope dataScope = optional.orElse(null);
         
         if (dataScope == null) {
             return;
@@ -561,5 +575,13 @@ public class DefaultWrapperBuilder implements WrapperBuilder {
         } else {
             wrapper.eq(tenantField, tenantId);
         }
+    }
+    
+    /**
+     * 清除 @DataScope 注解缓存
+     * <p>适用于热部署场景（如 Spring DevTools），类重新加载后需清除旧缓存避免内存泄漏。</p>
+     */
+    public void clearDataScopeCache() {
+        dataScopeCache.clear();
     }
 }
