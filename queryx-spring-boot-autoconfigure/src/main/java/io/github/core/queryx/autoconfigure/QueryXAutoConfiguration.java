@@ -81,30 +81,20 @@ public class QueryXAutoConfiguration {
     public WrapperBuilder wrapperBuilder(QueryParser queryParser,
                                          @Autowired(required = false) DataPermissionProvider dataPermissionProvider,
                                          @Autowired(required = false) TenantProvider tenantProvider) {
-        DefaultWrapperBuilder builder = new DefaultWrapperBuilder(queryParser);
-        
-        // 配置排序字段白名单
+        // 构建排序字段白名单验证器
+        OrderByValidator validator = null;
         if (queryXProperties.isOrderByWhitelistEnabled() 
                 && !CollectionUtils.isEmpty(queryXProperties.getOrderByWhitelist())) {
-            OrderByValidator validator = new OrderByValidator(queryXProperties.getOrderByWhitelist());
-            builder.setOrderByValidator(validator);
+            validator = new OrderByValidator(queryXProperties.getOrderByWhitelist());
         }
         
-        // 配置分页最大数量（默认 500）
-        builder.setMaxPageSize(queryXProperties.getMaxPageSize());
-        
-        // 配置数据权限提供者（如果存在）
-        if (dataPermissionProvider != null) {
-            builder.setDataPermissionProvider(dataPermissionProvider);
-        }
-        
-        // 配置租户提供者（如果存在）
-        if (tenantProvider != null && queryXProperties.isTenantEnabled()) {
-            builder.setTenantProvider(tenantProvider);
-            builder.setTenantField(queryXProperties.getTenantField());
-        }
-        
-        return builder;
+        // 使用完整构造函数，所有配置在构造时完成
+        return new DefaultWrapperBuilder(
+                queryParser,
+                validator,
+                dataPermissionProvider,
+                (tenantProvider != null && queryXProperties.isTenantEnabled()) ? tenantProvider : null,
+                queryXProperties.getTenantField());
     }
     
     /**

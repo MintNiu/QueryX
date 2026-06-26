@@ -6,10 +6,12 @@ import com.example.queryx.UserPageQuery;
 import com.example.queryx.UserQuery;
 import com.example.queryx.entity.User;
 import com.example.queryx.service.UserService;
+import io.github.core.queryx.annotation.BetweenValue;
 import io.github.core.queryx.builder.WrapperBuilder;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Date;
 import java.util.List;
 
 /**
@@ -62,13 +64,14 @@ public class UserController {
      * GET /api/users/test/or-like?keyword=张
      * 
      * 预期 SQL 片段：WHERE (username LIKE '%张%' OR email LIKE '%张%')
+     * 预期结果：返回匹配 username 或 email 包含 "张" 的用户列表
      */
     @GetMapping("/test/or-like")
-    public String testOrLike(String keyword) {
+    public List<User> testOrLike(String keyword) {
         UserPageQuery query = new UserPageQuery();
         query.setKeyword(keyword);
         QueryWrapper<User> wrapper = wrapperBuilder.build(query);
-        return "SQL: " + wrapper.getSqlSegment();
+        return userService.list(wrapper);
     }
 
     /**
@@ -80,13 +83,14 @@ public class UserController {
      * GET /api/users/test/empty-collection
      * 
      * 预期 SQL：不应包含 id IN () 或 id NOT IN ()
+     * 预期结果：返回所有租户 ID 匹配的用户（不受空集合影响）
      */
     @GetMapping("/test/empty-collection")
-    public String testEmptyCollection() {
+    public List<User> testEmptyCollection() {
         UserPageQuery query = new UserPageQuery();
         query.setIds(java.util.Collections.emptyList());
         QueryWrapper<User> wrapper = wrapperBuilder.build(query);
-        return "SQL: " + wrapper.getSqlSegment();
+        return userService.list(wrapper);
     }
 
     /**
@@ -98,13 +102,14 @@ public class UserController {
      * GET /api/users/test/empty-like?username=
      * 
      * 预期 SQL：不应包含 username LIKE
+     * 预期结果：返回所有租户 ID 匹配的用户（不受空字符串影响）
      */
     @GetMapping("/test/empty-like")
-    public String testEmptyLike(String username) {
+    public List<User> testEmptyLike(String username) {
         UserPageQuery query = new UserPageQuery();
         query.setUsername(username);
         QueryWrapper<User> wrapper = wrapperBuilder.build(query);
-        return "SQL: " + wrapper.getSqlSegment();
+        return userService.list(wrapper);
     }
 
     /**
@@ -135,13 +140,14 @@ public class UserController {
      * GET /api/users/test/between-right-null （测试右侧 null → 应生成 >=）
      * 
      * 预期 SQL：应包含 <= 或 >= 而非 BETWEEN
+     * 预期结果：返回 create_time <= 当前时间的用户
      */
     @GetMapping("/test/between-left-null")
-    public String testBetweenLeftNull() {
+    public List<User> testBetweenLeftNull() {
         UserQuery query = new UserQuery();
-        query.setCreateTime(new io.github.core.queryx.annotation.BetweenValue(null, new java.util.Date()));
+        query.setCreateTime(new BetweenValue(null, new Date()));
         QueryWrapper<User> wrapper = wrapperBuilder.build(query);
-        return "SQL: " + wrapper.getSqlSegment();
+        return userService.list(wrapper);
     }
 
     /**
@@ -153,13 +159,14 @@ public class UserController {
      * GET /api/users/test/tenant-dedup?status=1
      * 
      * 预期 SQL：应包含 status = 1 AND tenant_id = 1（去重后不重复）
+     * 预期结果：返回 status=1 且 tenant_id=1 的用户
      */
     @GetMapping("/test/tenant-dedup")
-    public String testTenantDedup(Integer status) {
+    public List<User> testTenantDedup(Integer status) {
         UserPageQuery query = new UserPageQuery();
         query.setStatus(status);
         QueryWrapper<User> wrapper = wrapperBuilder.build(query);
-        return "SQL: " + wrapper.getSqlSegment();
+        return userService.list(wrapper);
     }
 
     /**
@@ -171,13 +178,14 @@ public class UserController {
      * GET /api/users/test/single-parse?username=张&orderBy=id:desc
      * 
      * 预期 SQL：应同时包含 username LIKE 和 ORDER BY id DESC
+     * 预期结果：返回按 ID 降序排列、username 包含 "张" 的用户列表
      */
     @GetMapping("/test/single-parse")
-    public String testSingleParse(String username, String orderBy) {
+    public List<User> testSingleParse(String username, String orderBy) {
         UserPageQuery query = new UserPageQuery();
         query.setUsername(username);
         query.setOrderBy(orderBy);
         QueryWrapper<User> wrapper = wrapperBuilder.buildPageWrapper(query);
-        return "SQL: " + wrapper.getSqlSegment();
+        return userService.list(wrapper);
     }
 }

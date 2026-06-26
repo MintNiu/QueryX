@@ -2,13 +2,15 @@ package io.github.core.queryx.builder;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import io.github.core.queryx.support.DataPermissionProvider;
-import io.github.core.queryx.support.TenantProvider;
 
 /**
  * Wrapper 构建器接口
  * 
+ * <p>提供查询条件构建、分页对象构建、动态排序等核心功能。</p>
+ * <p>数据权限和租户配置应在自动配置阶段完成，无需通过接口暴露。</p>
+ * 
  * @author MintNiu
+ * @since 0.1.0
  */
 public interface WrapperBuilder {
 
@@ -30,7 +32,7 @@ public interface WrapperBuilder {
     
     /**
      * 构建分页查询的 QueryWrapper（包含查询条件和排序）
-     * 用于配合 MyBatis Plus 的 IService.page(Page, Wrapper) 方法使用
+     * <p>用于配合 MyBatis Plus 的 IService.page(Page, Wrapper) 方法使用</p>
      * 
      * @param query 查询 DTO
      * @return QueryWrapper
@@ -44,25 +46,4 @@ public interface WrapperBuilder {
      * @param orderBy 排序字符串，格式："id:desc,age:asc"
      */
     <T> void applyOrder(QueryWrapper<T> wrapper, String orderBy);
-    
-    /**
-     * 设置数据权限提供者
-     * 
-     * @param provider 数据权限提供者
-     */
-    void setDataPermissionProvider(DataPermissionProvider provider);
-    
-    /**
-     * 设置租户提供者
-     * 
-     * @param provider 租户提供者
-     */
-    void setTenantProvider(TenantProvider provider);
-    
-    /**
-     * 设置租户字段名
-     * 
-     * @param tenantField 租户字段名（默认 tenant_id）
-     */
-    void setTenantField(String tenantField);
 }

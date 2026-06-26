@@ -12,7 +12,6 @@ import io.github.core.queryx.support.DataPermissionProvider;
 import io.github.core.queryx.support.TenantProvider;
 import io.github.core.queryx.validator.OrderByResult;
 import io.github.core.queryx.validator.OrderByValidator;
-import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.Collection;
@@ -27,7 +26,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * <p>核心功能：</p>
  * <ul>
  *   <li>将查询 DTO 对象解析为 MyBatis Plus 的 {@link QueryWrapper}</li>
- *   <li>支持分页对象构建，并自动限制每页数量不超过 {@link #maxPageSize}</li>
+ *   <li>支持分页对象构建，并自动限制每页数量不超过 maxPageSize</li>
  *   <li>支持多字段动态排序，可选配合 {@link OrderByValidator} 进行白名单验证</li>
  *   <li>支持数据权限控制（@DataScope + DataPermissionProvider）</li>
  *   <li>支持多租户（TenantProvider，全局生效）</li>
@@ -44,7 +43,6 @@ public class DefaultWrapperBuilder implements WrapperBuilder {
     /**
      * 排序字段白名单验证器（可选）
      */
-    @Setter
     private OrderByValidator orderByValidator;
 
     /**
@@ -55,8 +53,7 @@ public class DefaultWrapperBuilder implements WrapperBuilder {
     /**
      * 数据权限提供者（可选）
      */
-    @Setter
-    private DataPermissionProvider dataPermissionProvider;
+    private final DataPermissionProvider dataPermissionProvider;
 
     /**
      * @DataScope 注解缓存（按查询类缓存，避免每次 build() 重复反射查找）
@@ -68,13 +65,12 @@ public class DefaultWrapperBuilder implements WrapperBuilder {
     /**
      * 租户提供者（可选）
      */
-    @Setter
-    private TenantProvider tenantProvider;
+    private final TenantProvider tenantProvider;
 
     /**
      * 租户字段名（默认 tenant_id）
      */
-    private String tenantField = "tenant_id";
+    private final String tenantField;
 
     /**
      * 基础构造函数
@@ -82,7 +78,7 @@ public class DefaultWrapperBuilder implements WrapperBuilder {
      * @param queryParser 查询解析器
      */
     public DefaultWrapperBuilder(QueryParser queryParser) {
-        this.queryParser = queryParser;
+        this(queryParser, null, null, null, null);
     }
 
     /**
@@ -92,10 +88,10 @@ public class DefaultWrapperBuilder implements WrapperBuilder {
      * @param allowedOrderFields 允许的排序字段数组
      */
     public DefaultWrapperBuilder(QueryParser queryParser, String... allowedOrderFields) {
-        this.queryParser = queryParser;
-        if (allowedOrderFields != null && allowedOrderFields.length > 0) {
-            this.orderByValidator = new OrderByValidator(allowedOrderFields);
-        }
+        this(queryParser, 
+             (allowedOrderFields != null && allowedOrderFields.length > 0) 
+                 ? new OrderByValidator(allowedOrderFields) : null,
+             null, null, null);
     }
 
     /**
@@ -105,10 +101,31 @@ public class DefaultWrapperBuilder implements WrapperBuilder {
      * @param allowedOrderFields 允许的排序字段集合
      */
     public DefaultWrapperBuilder(QueryParser queryParser, Set<String> allowedOrderFields) {
+        this(queryParser, 
+             (allowedOrderFields != null && !allowedOrderFields.isEmpty()) 
+                 ? new OrderByValidator(allowedOrderFields) : null,
+             null, null, null);
+    }
+    
+    /**
+     * 完整构造函数
+     *
+     * @param queryParser            查询解析器
+     * @param orderByValidator       排序字段白名单验证器（可选）
+     * @param dataPermissionProvider 数据权限提供者（可选）
+     * @param tenantProvider         租户提供者（可选）
+     * @param tenantField            租户字段名（默认 tenant_id）
+     */
+    public DefaultWrapperBuilder(QueryParser queryParser,
+                                 OrderByValidator orderByValidator,
+                                 DataPermissionProvider dataPermissionProvider,
+                                 TenantProvider tenantProvider,
+                                 String tenantField) {
         this.queryParser = queryParser;
-        if (allowedOrderFields != null && !allowedOrderFields.isEmpty()) {
-            this.orderByValidator = new OrderByValidator(allowedOrderFields);
-        }
+        this.orderByValidator = orderByValidator;
+        this.dataPermissionProvider = dataPermissionProvider;
+        this.tenantProvider = tenantProvider;
+        this.tenantField = (tenantField != null && !tenantField.trim().isEmpty()) ? tenantField : "tenant_id";
     }
 
     /**
@@ -194,6 +211,17 @@ public class DefaultWrapperBuilder implements WrapperBuilder {
         }
 
         return new Page<>(pageQuery.getCurrent(), size);
+    }
+
+    /**
+     * 设置分页最大每页数量
+     *
+     * @param maxPageSize 最大每页数量
+     */
+    public void setMaxPageSize(Long maxPageSize) {
+        if (maxPageSize != null && maxPageSize > 0) {
+            this.maxPageSize = maxPageSize;
+        }
     }
 
     /**
@@ -286,17 +314,6 @@ public class DefaultWrapperBuilder implements WrapperBuilder {
             } else {
                 wrapper.orderByAsc(fieldName);
             }
-        }
-    }
-
-    /**
-     * 设置分页最大每页数量
-     *
-     * @param maxPageSize 最大每页数量
-     */
-    public void setMaxPageSize(Long maxPageSize) {
-        if (maxPageSize != null && maxPageSize > 0) {
-            this.maxPageSize = maxPageSize;
         }
     }
 
@@ -543,18 +560,6 @@ public class DefaultWrapperBuilder implements WrapperBuilder {
             wrapper.in(tenantField, (Collection<?>) tenantId);
         } else {
             wrapper.eq(tenantField, tenantId);
-        }
-    }
-    
-    /**
-     * 设置租户字段名
-     *
-     * @param tenantField 租户字段名
-     */
-    @Override
-    public void setTenantField(String tenantField) {
-        if (tenantField != null && !tenantField.trim().isEmpty()) {
-            this.tenantField = tenantField;
         }
     }
 }
