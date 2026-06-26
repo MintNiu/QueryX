@@ -60,8 +60,10 @@ public class DefaultWrapperBuilder implements WrapperBuilder {
 
     /**
      * @DataScope 注解缓存（按查询类缓存，避免每次 build() 重复反射查找）
+     * <p>使用 Optional 包装，因为 ConcurrentHashMap 不允许 value 为 null，
+     * 而部分 DTO 类可能未标注 @DataScope。</p>
      */
-    private final ConcurrentHashMap<Class<?>, DataScope> dataScopeCache = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<Class<?>, java.util.Optional<DataScope>> dataScopeCache = new ConcurrentHashMap<>();
 
     /**
      * 租户提供者（可选）
@@ -127,10 +129,18 @@ public class DefaultWrapperBuilder implements WrapperBuilder {
             return wrapper;
         }
 
+        List<QueryFieldMetadata> metadataList = queryParser.parse(query);
+        return doBuild(wrapper, query, metadataList);
+    }
+
+    /**
+     * 内部构建方法，使用已解析的元数据，避免重复解析。
+     */
+    private <T> QueryWrapper<T> doBuild(QueryWrapper<T> wrapper, Object query,
+                                        List<QueryFieldMetadata> metadataList) {
         // 跟踪已应用的字段名，用于租户/数据权限去重
         Set<String> appliedFields = new HashSet<>();
 
-        List<QueryFieldMetadata> metadataList = queryParser.parse(query);
         for (QueryFieldMetadata metadata : metadataList) {
             // 跳过排序字段（不是查询条件）
             if (metadata.getOperator() == QueryOperator.ORDER_BY) {
@@ -197,11 +207,18 @@ public class DefaultWrapperBuilder implements WrapperBuilder {
      */
     @Override
     public <T> QueryWrapper<T> buildPageWrapper(Object query) {
-        // 构建查询条件
-        QueryWrapper<T> wrapper = build(query);
+        QueryWrapper<T> wrapper = new QueryWrapper<>();
+        if (query == null) {
+            return wrapper;
+        }
 
-        // 应用排序到 QueryWrapper
+        // 只解析一次，复用结果构建查询条件和排序
         List<QueryFieldMetadata> metadataList = queryParser.parse(query);
+
+        // 构建查询条件（含数据权限、租户去重）
+        doBuild(wrapper, query, metadataList);
+
+        // 应用排序（从已解析的元数据中提取）
         for (QueryFieldMetadata metadata : metadataList) {
             if (metadata.getOperator() == QueryOperator.ORDER_BY) {
                 String orderByStr = (String) metadata.getValue();
@@ -326,7 +343,15 @@ public class DefaultWrapperBuilder implements WrapperBuilder {
             case BETWEEN:
                 if (value instanceof BetweenValue) {
                     BetweenValue betweenValue = (BetweenValue) value;
-                    wrapper.between(fieldName, betweenValue.getLeft(), betweenValue.getRight());
+                    // P3-7: 处理单侧 null 场景
+                    if (betweenValue.getLeft() != null && betweenValue.getRight() != null) {
+                        wrapper.between(fieldName, betweenValue.getLeft(), betweenValue.getRight());
+                    } else if (betweenValue.getLeft() != null) {
+                        wrapper.ge(fieldName, betweenValue.getLeft());
+                    } else if (betweenValue.getRight() != null) {
+                        wrapper.le(fieldName, betweenValue.getRight());
+                    }
+                    // 两侧都为 null 的情况已在 parse() 中过滤
                 }
                 break;
             default:
@@ -397,15 +422,38 @@ public class DefaultWrapperBuilder implements WrapperBuilder {
 
     /**
      * 应用 OR 组中单个字段的条件
+     * <p>P0-1 修复：使用 @Or 注解的 operator 属性决定条件类型</p>
      */
     private <T> void applyOrGroupFieldCondition(QueryWrapper<T> wrapper, String fieldName,
                                                 Object value, QueryFieldMetadata metadata) {
-        String strValue = value.toString();
-
-        if (value instanceof Collection) {
-            wrapper.in(fieldName, (Collection<?>) value);
-        } else {
-            wrapper.like(fieldName, strValue);
+        QueryOperator orOp = metadata.getOrOperator();
+        
+        // 默认回退到 LIKE（向后兼容）
+        if (orOp == null) {
+            orOp = QueryOperator.LIKE;
+        }
+        
+        switch (orOp) {
+            case EQ:
+                wrapper.eq(fieldName, value);
+                break;
+            case IN:
+                if (value instanceof Collection) {
+                    wrapper.in(fieldName, (Collection<?>) value);
+                } else {
+                    wrapper.eq(fieldName, value);
+                }
+                break;
+            case LIKE:
+            default:
+                // LIKE 操作符要求 String 类型，非 String 降级为 EQ
+                if (value instanceof String) {
+                    wrapper.like(fieldName, (String) value);
+                } else {
+                    log.warn("[QueryX] @Or(operator=LIKE) 字段 {} 的值不是 String 类型，已降级为 EQ", fieldName);
+                    wrapper.eq(fieldName, value);
+                }
+                break;
         }
     }
     
@@ -425,8 +473,10 @@ public class DefaultWrapperBuilder implements WrapperBuilder {
             return;
         }
         
+        // 使用 Optional 包装，避免 ConcurrentHashMap 不允许 value 为 null 的问题
         DataScope dataScope = dataScopeCache.computeIfAbsent(
-                query.getClass(), clazz -> clazz.getAnnotation(DataScope.class));
+                query.getClass(), clazz -> java.util.Optional.ofNullable(clazz.getAnnotation(DataScope.class)))
+                .orElse(null);
         
         if (dataScope == null) {
             return;

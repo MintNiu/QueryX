@@ -27,6 +27,11 @@ public class QueryFieldMetadata {
      * OR 组合字段列表（用于 OR_GROUP 操作符）
      */
     private List<String> orFields;
+    
+    /**
+     * OR 组合操作符（用于 OR_GROUP 中每个字段的条件类型）
+     */
+    private QueryOperator orOperator;
 
     public QueryFieldMetadata(String fieldName, Object value, QueryOperator operator) {
         this.fieldName = fieldName;

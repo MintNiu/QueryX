@@ -50,4 +50,134 @@ public class UserController {
         // 执行分页查询
         return userService.page(page, wrapper);
     }
+
+    // ==================== 测试接口（验证两轮审查修复的功能增强） ====================
+
+    /**
+     * 测试 1：@Or LIKE 操作符正常生效
+     * 
+     * 验证：@Or(fields={"username","email"}, operator=Or.Op.LIKE) 正确生成 OR 条件
+     * 
+     * 请求：
+     * GET /api/users/test/or-like?keyword=张
+     * 
+     * 预期 SQL 片段：WHERE (username LIKE '%张%' OR email LIKE '%张%')
+     */
+    @GetMapping("/test/or-like")
+    public String testOrLike(String keyword) {
+        UserPageQuery query = new UserPageQuery();
+        query.setKeyword(keyword);
+        QueryWrapper<User> wrapper = wrapperBuilder.build(query);
+        return "SQL: " + wrapper.getSqlSegment();
+    }
+
+    /**
+     * 测试 2：空集合自动跳过，不生成 IN ()
+     * 
+     * 验证：@In 传入空 List 时自动过滤，不生成无效 SQL
+     * 
+     * 请求：
+     * GET /api/users/test/empty-collection
+     * 
+     * 预期 SQL：不应包含 id IN () 或 id NOT IN ()
+     */
+    @GetMapping("/test/empty-collection")
+    public String testEmptyCollection() {
+        UserPageQuery query = new UserPageQuery();
+        query.setIds(java.util.Collections.emptyList());
+        QueryWrapper<User> wrapper = wrapperBuilder.build(query);
+        return "SQL: " + wrapper.getSqlSegment();
+    }
+
+    /**
+     * 测试 3：空字符串 LIKE 自动跳过
+     * 
+     * 验证：@Like 传入空字符串时自动过滤，不生成 LIKE '%%' 匹配全部行
+     * 
+     * 请求：
+     * GET /api/users/test/empty-like?username=
+     * 
+     * 预期 SQL：不应包含 username LIKE
+     */
+    @GetMapping("/test/empty-like")
+    public String testEmptyLike(String username) {
+        UserPageQuery query = new UserPageQuery();
+        query.setUsername(username);
+        QueryWrapper<User> wrapper = wrapperBuilder.build(query);
+        return "SQL: " + wrapper.getSqlSegment();
+    }
+
+    /**
+     * 测试 4：继承字段注解生效
+     * 
+     * 验证：BasePageQuery 的 current/size 字段正确解析
+     * 
+     * 请求：
+     * GET /api/users/test/inherited?current=2&size=20
+     * 
+     * 预期输出：current=2, size=20
+     */
+    @GetMapping("/test/inherited")
+    public String testInherited(Long current, Long size) {
+        UserPageQuery query = new UserPageQuery();
+        query.setCurrent(current);
+        query.setSize(size);
+        return "current=" + query.getCurrent() + ", size=" + query.getSize();
+    }
+
+    /**
+     * 测试 5：BetweenValue 单侧 null 降级处理
+     * 
+     * 验证：单侧 null 时自动降级为 >= 或 <=
+     * 
+     * 请求：
+     * GET /api/users/test/between-left-null （测试左侧 null → 应生成 <=）
+     * GET /api/users/test/between-right-null （测试右侧 null → 应生成 >=）
+     * 
+     * 预期 SQL：应包含 <= 或 >= 而非 BETWEEN
+     */
+    @GetMapping("/test/between-left-null")
+    public String testBetweenLeftNull() {
+        UserQuery query = new UserQuery();
+        query.setCreateTime(new io.github.core.queryx.annotation.BetweenValue(null, new java.util.Date()));
+        QueryWrapper<User> wrapper = wrapperBuilder.build(query);
+        return "SQL: " + wrapper.getSqlSegment();
+    }
+
+    /**
+     * 测试 6：多租户字段与用户条件共存，不重复
+     * 
+     * 验证：租户条件与用户手动指定的同名字段去重
+     * 
+     * 请求：
+     * GET /api/users/test/tenant-dedup?status=1
+     * 
+     * 预期 SQL：应包含 status = 1 AND tenant_id = 1（去重后不重复）
+     */
+    @GetMapping("/test/tenant-dedup")
+    public String testTenantDedup(Integer status) {
+        UserPageQuery query = new UserPageQuery();
+        query.setStatus(status);
+        QueryWrapper<User> wrapper = wrapperBuilder.build(query);
+        return "SQL: " + wrapper.getSqlSegment();
+    }
+
+    /**
+     * 测试 7：buildPageWrapper 单次解析验证（性能优化）
+     * 
+     * 验证：buildPageWrapper() 只调用一次 parse()，复用元数据
+     * 
+     * 请求：
+     * GET /api/users/test/single-parse?username=张&orderBy=id:desc
+     * 
+     * 预期 SQL：应同时包含 username LIKE 和 ORDER BY id DESC
+     */
+    @GetMapping("/test/single-parse")
+    public String testSingleParse(String username, String orderBy) {
+        UserPageQuery query = new UserPageQuery();
+        query.setUsername(username);
+        query.setOrderBy(orderBy);
+        QueryWrapper<User> wrapper = wrapperBuilder.buildPageWrapper(query);
+        return "SQL: " + wrapper.getSqlSegment();
+    }
 }

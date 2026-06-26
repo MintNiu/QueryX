@@ -8,7 +8,6 @@ import io.github.core.queryx.support.DataPermissionProvider;
 import io.github.core.queryx.support.TenantProvider;
 import io.github.core.queryx.validator.OrderByValidator;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;

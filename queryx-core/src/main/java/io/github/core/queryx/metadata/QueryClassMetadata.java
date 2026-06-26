@@ -43,5 +43,6 @@ public class QueryClassMetadata {
         private final boolean not;
         private final Eq.Op op;
         private final List<String> orFields;
+        private final QueryOperator orOperator;
     }
 }

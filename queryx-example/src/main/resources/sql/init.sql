@@ -21,11 +21,11 @@ CREATE TABLE sys_user (
 
 -- 3. 插入测试数据
 INSERT INTO sys_user (username, email, age, status) VALUES 
-('张三', 'zhangsan@example.com', 25, 1,1),
-('李四', 'lisi@example.com', 30, 1,1),
-('王五', 'wangwu@example.com', 45, 0,1),
-('张三要', 'zhangsanyao@example.com', 18, 1,2),
-('赵六', 'zhaoliu@example.com', 35, 1,2);
+('张三', 'zhangsan@example.com', 25, 1, 1),
+('李四', 'lisi@example.com', 30, 1, 1),
+('王五', 'wangwu@example.com', 45, 0, 1),
+('张三要', 'zhangsanyao@example.com', 18, 1, 2),
+('赵六', 'zhaoliu@example.com', 35, 1, 2);
 
 -- 4. 查询验证
 SELECT * FROM sys_user;
